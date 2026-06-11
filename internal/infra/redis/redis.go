@@ -2,8 +2,10 @@ package redis
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
+	"github.com/labib0x9/short/config"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -48,7 +50,7 @@ type Redis struct {
 	Script *redis.Script
 }
 
-func NewRedis(cnf *config.RedisConfig) *Redis {
+func NewRedis(cnf *config.Redis) *Redis {
 	return &Redis{
 		Client: redis.NewClient(
 			&redis.Options{
@@ -71,10 +73,11 @@ func (r *Redis) Ping() error {
 	return r.Client.Ping(ctx).Err()
 }
 
-func Setup(cnf *config.RedisConfig) *Redis {
+func Setup(cnf *config.Redis) *Redis {
 	r := NewRedis(cnf)
 	if err := r.Ping(); err != nil {
 		panic(err)
 	}
+	slog.Info("Redis started")
 	return r
 }

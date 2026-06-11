@@ -4,8 +4,8 @@ import (
 	"github.com/labib0x9/short/config"
 	// urlapp "github.com/labib0x9/short/internal/app/url"
 	"github.com/labib0x9/short/internal/infra/postgres"
+	"github.com/labib0x9/short/internal/infra/redis"
 	// "github.com/labib0x9/short/internal/infra/rabbitmq"
-	// "github.com/labib0x9/short/internal/infra/redis"
 	// rest "github.com/labib0x9/short/internal/transport/http"
 	// "github.com/labib0x9/short/internal/transport/http/handler/url"
 	// "github.com/labib0x9/short/internal/worker"
@@ -19,8 +19,8 @@ func main() {
 	dbConn := postgresConn.SetupAndConnection(cnf.PostgreSQL)
 	defer dbConn.Close()
 
-	// redisClient := redis.Setup(cnf.Redis)
-	// defer redisClient.Close()
+	redisClient := redis.Setup(cnf.Redis)
+	defer redisClient.Close()
 
 	// rabbitMq := rabbitmq.NewRabbitMQ(cnf.RabbitMq)
 	// defer rabbitMq.Close()
