@@ -1,26 +1,27 @@
 package postgres
 
-import (
-	"github.com/jmoiron/sqlx"
-	"github.com/labib0x9/short/internal/domain/url"
-)
+// type urlRepo struct {
+// 	db *sqlx.DB
+// }
 
-type urlRepo struct {
-	db *sqlx.DB
-}
+// func NewUrlRepository(db *sqlx.DB) url.UrlRepository {
+// 	return &urlRepo{
+// 		db: db,
+// 	}
+// }
 
-func NewUrlRepository(db *sqlx.DB) url.UrlRepository {
-	return &urlRepo{
-		db: db,
-	}
-}
+// func (u *urlRepo) Create(url url.Url) error                          {}
+// func (u *urlRepo) GetByShortCode(shortCode string) (*url.Url, error) {}
 
-func (u *urlRepo) Create(url url.Url) error                          {}
-func (u *urlRepo) GetByShortCode(shortCode string) (*url.Url, error) {}
+// type analysisRepo struct {
+// 	db *sqlx.DB
+// }
 
-
-
-package repositories
+// func NewAnalysisRepository(db *sqlx.DB) url.AnalyticsRepository {
+// 	return &analysisRepo{
+// 		db: db,
+// 	}
+// }
 
 // import (
 // 	"database/sql"
