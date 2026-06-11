@@ -20,7 +20,7 @@ func NewRabbitMQ(cnf *config.RabbitMq) *RabbitMQ {
 	url := fmt.Sprintf("amqp://%s:%s@%s/", cnf.User, cnf.Pass, cnf.Addr)
 	conn, err := amqp.Dial(url)
 	if err != nil {
-		panic(fmt.Errorf("rabbitmq dial: %w", err))
+		panic(fmt.Errorf("rabbitmq dial: %w, url=%s", err, url))
 		return nil
 	}
 
