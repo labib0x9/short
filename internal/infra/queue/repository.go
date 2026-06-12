@@ -5,5 +5,5 @@ import (
 )
 
 type Queue interface {
-	PublishEmail(ctx context.Context, msg Message) error
+	Publish(ctx context.Context, msg ClickEvent) error
 }

@@ -1,71 +1,164 @@
 package postgres
 
-// type urlRepo struct {
-// 	db *sqlx.DB
-// }
+import (
+	"time"
 
-// func NewUrlRepository(db *sqlx.DB) url.UrlRepository {
-// 	return &urlRepo{
-// 		db: db,
-// 	}
-// }
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+	"github.com/labib0x9/short/internal/domain/url"
+)
 
-// func (u *urlRepo) Create(url url.Url) error                          {}
-// func (u *urlRepo) GetByShortCode(shortCode string) (*url.Url, error) {}
+type urlRepo struct {
+	db *sqlx.DB
+}
 
-// type analysisRepo struct {
-// 	db *sqlx.DB
-// }
+func NewUrlRepository(db *sqlx.DB) url.UrlRepository {
+	return &urlRepo{
+		db: db,
+	}
+}
 
-// func NewAnalysisRepository(db *sqlx.DB) url.AnalyticsRepository {
-// 	return &analysisRepo{
-// 		db: db,
-// 	}
-// }
+func (u *urlRepo) Create(url url.Url) error {
+	query := `insert into 
+		urls(url, short, expire_at)
+		values(:url, :short, :expire_at)
+	`
 
-// import (
-// 	"database/sql"
-// 	"log/slog"
-// 	"urlshortener/models"
-// 	"urlshortener/utils"
-// )
+	rows, err := u.db.NamedQuery(query, url)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
 
-// // MysqlUrlRepository implements UrlRepository using a MySQL database as the backend
-// // It provides methods to create and retrieve URL mappings from the MySQL database
-// type MysqlUrlRepository struct {
-// 	db *sql.DB // Database connection
-// }
+	return nil
+}
 
-// // NewMysqlUrlRepository creates a new MysqlUrlRepository with the given database connection
-// func NewMysqlUrlRepository(db *sql.DB) *MysqlUrlRepository {
-// 	return &MysqlUrlRepository{
-// 		db: db,
-// 	}
-// }
+func (u *urlRepo) GetByShortCode(shortCode string) (*url.Url, error) {
+	query := `select * from urls where short = $1`
+	var found url.Url
+	if err := u.db.Get(&found, query, shortCode); err != nil {
+		return nil, err
+	}
+	return &found, nil
+}
 
-// // Create inserts a new URL mapping into the MySQL database
-// func (u *MysqlUrlRepository) Create(url models.Url) error {
-// 	query := "INSERT INTO urls (url, short_url, created_at, expire) VALUES (?, ?, ?, ?)"
-// 	_, err := u.db.Exec(query, url.URL, url.ShortURL, url.CreatedAt, url.Expire)
-// 	if err != nil {
-// 		slog.Error(" [mysql_url_repository.go] [URL INSERT] ", slog.Any("error", err))
-// 		return utils.ErrDatabaseInsert
-// 	}
-// 	return nil
-// }
+func (u *urlRepo) Update(id uuid.UUID, lastClickedAt time.Time) error {
+	query := `
+		update urls
+		set
+			last_clicked_at = $1,
+			total = COALESCE(total, 0) + 1
+		where id = $2`
+	_, err := u.db.Exec(query, lastClickedAt, id)
+	return err
+}
 
-// // GetByShortCode retrieves a URL mapping by its short code from the MySQL database
-// func (u *MysqlUrlRepository) GetByShortCode(shortCode string) (*models.Url, error) {
-// 	query := "SELECT id, url, short_url, created_at, expire FROM urls WHERE short_url = ?"
-// 	row := u.db.QueryRow(query, shortCode)
-// 	var url models.Url
-// 	err := row.Scan(&url.Id, &url.URL, &url.ShortURL, &url.CreatedAt, &url.Expire)
-// 	if err != nil {
-// 		if err == sql.ErrNoRows {
-// 			return nil, nil // No result found
-// 		}
-// 		slog.Error(" [mysql_url_repository.go] [URL QUERY] ", slog.Any("error", err))
-// 		return nil, utils.ErrDatabaseQuery
-// 	}
-// 	return &url, nil
-// }
+func (u *urlRepo) GetMetadata(code string) (*url.Url, error) {
+	query := `
+		select
+			id, total, last_clicked_at, created_at, expire_at
+		from urls
+		where short = $1`
+	var found url.Url
+	if err := u.db.Get(&found, query, code); err != nil {
+		return nil, err
+	}
+	return &found, nil
+}
+
+type analysisRepo struct {
+	db *sqlx.DB
+}
+
+func NewAnalysisRepository(db *sqlx.DB) url.AnalyticsRepository {
+	return &analysisRepo{
+		db: db,
+	}
+}
+
+func (a *analysisRepo) Create(click url.Click) error {
+	query := `insert into 
+		clicks(url_id, referer, country, device, os, browser, clicked_at)
+		values(:url_id, :referer, :country, :device, :os, :browser, :clicked_at)
+	`
+
+	rows, err := a.db.NamedQuery(query, click)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	return nil
+}
+
+func (a *analysisRepo) GetBrowserCount(Id uuid.UUID) (map[string]int64, error) {
+	result := map[string]int64{}
+	query := `
+		select
+			browser, count(*)
+		from
+			clicks
+		where url_id = $1
+		group by browser
+	`
+	rows, err := a.db.Query(query, Id)
+	if err != nil {
+		return result, err
+	}
+
+	for rows.Next() {
+		var k string
+		var v int64
+		rows.Scan(&k, &v)
+		result[k] = v
+	}
+	return result, nil
+}
+
+func (a *analysisRepo) GetDeviceCount(Id uuid.UUID) (map[string]int64, error) {
+	result := map[string]int64{}
+	query := `
+		select
+			device, count(*)
+		from
+			clicks
+		where url_id = $1
+		group by device
+	`
+	rows, err := a.db.Query(query, Id)
+	if err != nil {
+		return result, err
+	}
+
+	for rows.Next() {
+		var k string
+		var v int64
+		rows.Scan(&k, &v)
+		result[k] = v
+	}
+	return result, nil
+}
+
+func (a *analysisRepo) GetOSCount(Id uuid.UUID) (map[string]int64, error) {
+	result := map[string]int64{}
+	query := `
+		select
+			os, count(*)
+		from
+			clicks
+		where url_id = $1
+		group by os
+	`
+	rows, err := a.db.Query(query, Id)
+	if err != nil {
+		return result, err
+	}
+
+	for rows.Next() {
+		var k string
+		var v int64
+		rows.Scan(&k, &v)
+		result[k] = v
+	}
+	return result, nil
+}

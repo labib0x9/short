@@ -1,7 +1,12 @@
 package queue
 
-type Message struct {
-	To    string `json:"to"`
-	Name  string `json:"name"`
-	Token string `json:"token"`
+import "time"
+
+type ClickEvent struct {
+	ShortCode string    `json:"short_code"`
+	ClickedAt time.Time `json:"clicked_at"`
+	Referer   string    `json:"referer"`
+	UserAgent string    `json:"user_agent"`
+	IP        string    `json:"ip"`
+	Retries   int       `json:"retires"`
 }

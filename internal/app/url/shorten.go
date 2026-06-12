@@ -1,45 +1,56 @@
 package url
 
-func (s *service) ShortenURL() {
-	// var req UrlRequest
-	// if err := ctx.ShouldBindJSON(&req); err != nil {
-	// 	ctx.JSON(422, gin.H{
-	// 		"error": "Validation error",
-	// 	})
-	// 	return
-	// }
+import (
+	"database/sql"
+	"errors"
+	"time"
 
-	// // Validate URL format
-	// u, err := url.ParseRequestURI(req.Url)
-	// if err != nil || u.Scheme == "" || u.Host == "" {
-	// 	ctx.JSON(400, gin.H{
-	// 		"error": "Invalid URL format",
-	// 	})
-	// 	return
-	// }
+	"github.com/labib0x9/short/internal/domain/url"
+	"github.com/labib0x9/short/internal/utils"
+)
 
-	// // Check if URL length is valid (greater than 25 characters)
-	// if len(req.Url) <= 25 {
-	// 	ctx.JSON(400, gin.H{
-	// 		"error": "URL must be longer than 25 characters",
-	// 	})
-	// 	return
-	// }
+type ShortenResult struct {
+	Msg      string     `json:"msg"`
+	Code     string     `json:"code"`
+	ShortUrl string     `json:"short_url"`
+	ExpireAt *time.Time `json:"expire_at"`
+}
 
-	// // Create the short URL using the service
-	// short, expireAt, err := s.UrlService.CreateShortUrl(req.Url, req.ExpireAt, ctx.Request.UserAgent())
-	// if err != nil {
-	// 	ctx.JSON(500, gin.H{
-	// 		"error": "Internal server error",
-	// 	})
-	// 	return
-	// }
+func (s *service) Shorten(longUrl string, expireAt *time.Time, userAgent string) (ShortenResult, error) {
+	if len(longUrl) <= 25 {
+		return ShortenResult{}, url.ErrUrlShortLenght
+	}
 
-	// // Build the full short URL with prefix
-	// prefix := os.Getenv("SHORT_URL_PREFIX")
-	// ctx.JSON(201, gin.H{
-	// 	"message":   "success",
-	// 	"short_url": prefix + short,
-	// 	"expire_at": expireAt,
-	// })
+	uniqueId := utils.UniqueId(userAgent)
+	short := utils.GetShortUrl(longUrl + uniqueId)
+
+	createdAt := time.Now()
+
+	existShort, err := s.urlRepo.GetByShortCode(short)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return ShortenResult{}, err
+	}
+
+	if existShort != nil {
+		return ShortenResult{}, url.ErrShortCodeCollision
+	}
+
+	value := url.Url{
+		URL:       longUrl,
+		ShortURL:  short,
+		CreatedAt: createdAt,
+		ExpireAt:  expireAt,
+	}
+
+	err = s.urlRepo.Create(value)
+	if err != nil {
+		return ShortenResult{}, err
+	}
+
+	return ShortenResult{
+		Msg:      "success",
+		Code:     value.ShortURL,
+		ShortUrl: s.cnf.Prefix + value.ShortURL,
+		ExpireAt: value.ExpireAt,
+	}, nil
 }

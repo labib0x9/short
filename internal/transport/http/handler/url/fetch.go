@@ -1,35 +1,35 @@
 package url
 
 import (
+	"log/slog"
 	"net/http"
+	"time"
+
+	"github.com/labib0x9/short/internal/infra/queue"
 )
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	// shortCode := ctx.Param("code")
-	// if shortCode == "" {
-	// 	ctx.JSON(400, gin.H{
-	// 		"error": "Short URL code is required",
-	// 	})
-	// 	return
-	// }
-	// url, err := s.UrlService.GetUrlByCode(shortCode)
+	code := r.PathValue("code")
+	if code == "" {
+		// 400
+		return
+	}
 
-	// if err != nil {
-	// 	errMsg := "Internal server error"
-	// 	errCode := 500
-	// 	switch err {
-	// 	case utils.ErrUrlNotFound:
-	// 		errMsg, errCode = "URL not found", 404
+	url, err := h.srv.Get(r.Context(), code)
+	if err != nil {
+		http.Error(w, "internl server error", http.StatusInternalServerError)
+		slog.Warn("Get: srv.Get()", "error", err)
+		return
+	}
 
-	// 	case utils.ErrShortCodeExpired:
-	// 		errMsg, errCode = "URL has expired", 410
-	// 	}
+	http.Redirect(w, r, url.URL, http.StatusFound)
 
-	// 	ctx.JSON(errCode, gin.H{
-	// 		"error": errMsg,
-	// 	})
-	// 	return
-	// }
-
-	// ctx.Redirect(301, url.URL)
+	h.queue.Publish(r.Context(), queue.ClickEvent{
+		ShortCode: code,
+		ClickedAt: time.Now(),
+		Referer:   r.Referer(),
+		UserAgent: r.UserAgent(),
+		IP:        r.RemoteAddr,
+		Retries:   2,
+	})
 }

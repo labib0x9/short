@@ -52,6 +52,6 @@ func (r *RabbitMQ) publish(ctx context.Context, queue string, payload any) error
 	return nil
 }
 
-func (r *RabbitMQ) Publish(ctx context.Context, msg queue.Message) error {
+func (r *RabbitMQ) Publish(ctx context.Context, msg queue.ClickEvent) error {
 	return r.publish(ctx, Queue, msg)
 }

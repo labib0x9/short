@@ -13,4 +13,6 @@ var (
 	ErrDatabaseInsert     = errors.New("database insert error")
 	ErrDatabaseUpdate     = errors.New("database update error")
 	ErrDatabaseDelete     = errors.New("database delete error")
+
+	ErrUrlShortLenght = errors.New("")
 )

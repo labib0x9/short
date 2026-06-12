@@ -1,7 +1,10 @@
 CREATE TABLE clicks (
-    id     UUID      NOT NULL UNIQUE REFERENCES urls(id) ON DELETE CASCADE,
+    id  SERIAL PRIMARY KEY,
+    url_id   UUID      NOT NULL REFERENCES urls(id) ON DELETE CASCADE,
     referer     VARCHAR(500) NOT NULL DEFAULT '',
     country     VARCHAR(100) NOT NULL DEFAULT '',
-    device_type VARCHAR(50)  NOT NULL DEFAULT '',
-    clicked_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    device VARCHAR(50)  NOT NULL DEFAULT '',
+    os VARCHAR(50)  NOT NULL DEFAULT '',
+    browser VARCHAR(50)  NOT NULL DEFAULT '',
+    clicked_at  TIMESTAMP     NOT NULL DEFAULT NOW()
 );

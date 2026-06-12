@@ -37,6 +37,8 @@ type Config struct {
 	Port    int
 	Service string
 
+	Prefix string
+
 	PostgreSQL *PostgreSQL
 	Redis      *Redis
 	RabbitMq   *RabbitMq
@@ -57,6 +59,11 @@ func loadConfig() {
 	portS := os.Getenv("PORT")
 	if portS == "" {
 		log.Panic("PORT")
+	}
+
+	prefix := os.Getenv("PREFIX")
+	if prefix == "" {
+		log.Panic("PREFIX")
 	}
 
 	port, err := strconv.Atoi(portS)
@@ -142,6 +149,7 @@ func loadConfig() {
 	configuration = &Config{
 		Port:    port,
 		Service: serviceName,
+		Prefix:  prefix,
 		PostgreSQL: &PostgreSQL{
 			User:          dbUser,
 			Pass:          dbPass,

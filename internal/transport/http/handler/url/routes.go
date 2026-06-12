@@ -9,16 +9,16 @@ import (
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, manager *middleware.Manager) {
 
 	mux.Handle(
-		"GET /{code}",
+		"GET /{code}/stat",
 		manager.With(
-			http.HandlerFunc(h.Get),
+			http.HandlerFunc(h.Analysis),
 		),
 	)
 
 	mux.Handle(
-		"GET /fetch/{code}",
+		"GET /{code}",
 		manager.With(
-			http.HandlerFunc(h.Analysis),
+			http.HandlerFunc(h.Get),
 		),
 	)
 

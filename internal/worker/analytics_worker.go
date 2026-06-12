@@ -2,161 +2,201 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
 
+	"github.com/labib0x9/short/internal/domain/url"
 	"github.com/labib0x9/short/internal/infra/cache"
+	"github.com/labib0x9/short/internal/infra/queue"
 	"github.com/labib0x9/short/internal/infra/rabbitmq"
+	"github.com/mileusna/useragent"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Worker struct {
-	client *rabbitmq.RabbitMQ
-	cache  cache.CacheRepo
-	// uploaderRepo media.UploaderRepository
-	maxRetries int
+	client       *rabbitmq.RabbitMQ
+	urlRepo      url.UrlRepository
+	analysisRepo url.AnalyticsRepository
+	cache        cache.CacheRepo
+	maxRetries   int
 }
 
-func NewVideoWorker(client *rabbitmq.RabbitMQ, cacheRepo cache.CacheRepo) *Worker {
+func NewWorker(
+	client *rabbitmq.RabbitMQ,
+	urlRepo url.UrlRepository,
+	analysisRepo url.AnalyticsRepository,
+	cacheRepo cache.CacheRepo,
+) *Worker {
 	return &Worker{
-		client:     client,
-		maxRetries: 2,
-		cache:      cacheRepo,
+		client:       client,
+		maxRetries:   2,
+		cache:        cacheRepo,
+		urlRepo:      urlRepo,
+		analysisRepo: analysisRepo,
 	}
 }
 
 func (w *Worker) Run(ctx context.Context, concurrency int) error {
 
-	// // dedicated consumer channel
-	// ch, err := w.client.Channel()
-	// if err != nil {
-	// 	return fmt.Errorf("open channel: %w", err)
-	// }
-	// defer ch.Close()
+	// dedicated consumer channel
+	ch, err := w.client.Channel()
+	if err != nil {
+		return fmt.Errorf("open channel: %w", err)
+	}
+	defer ch.Close()
 
-	// // limit unacked messages
-	// err = ch.Qos(concurrency, 0, false)
-	// if err != nil {
-	// 	return fmt.Errorf("qos: %w", err)
-	// }
+	// limit unacked messages
+	err = ch.Qos(concurrency, 0, false)
+	if err != nil {
+		return fmt.Errorf("qos: %w", err)
+	}
 
-	// 	msgs, err := ch.Consume(
-	// 		rabbitmq.ProcessQueue,
-	// 		"video-worker",
-	// 		false, // auto ack
-	// 		false, // exclusive
-	// 		false, // no local
-	// 		false, // no wait
-	// 		nil,
-	// 	)
-	// 	if err != nil {
-	// 		return fmt.Errorf("consume: %w", err)
-	// 	}
+	msgs, err := ch.Consume(
+		rabbitmq.Queue,
+		"analytics-worker",
+		false, // auto ack
+		false, // exclusive
+		false, // no local
+		false, // no wait
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("consume: %w", err)
+	}
 
-	// 	slog.Info("video worker started", "concurrency", concurrency)
+	slog.Info("analytics worker started", "concurrency", concurrency)
 
-	// 	sem := make(chan struct{}, concurrency)
-	// 	for {
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			slog.Info("video worker shutting down")
-	// 			return nil
-	// 		case d, ok := <-msgs:
-	// 			if !ok {
-	// 				return fmt.Errorf("consumer channel closed")
-	// 			}
-	// 			sem <- struct{}{}
-	// 			go func(d amqp.Delivery) {
-	// 				defer func() {
-	// 					<-sem
-	// 				}()
-	// 				w.handle(ctx, d)
-	// 			}(d)
-	// 		}
-	// 	}
-	// }
-
-	// func (w *VideoWorker) handle(ctx context.Context, d amqp.Delivery) {
-	// 	slog.Info("Inside Worker Msg Queue")
-	// 	var msg queue.VideoMessage
-	// 	err := json.Unmarshal(d.Body, &msg)
-	// 	if err != nil {
-	// 		slog.Error("invalid video message", "error", err)
-	// 		d.Nack(false, false)
-	// 		return
-	// 	}
-
-	// 	slog.Info("processing video", "key", msg.Key, "userID", msg.UserID, "JobId", msg.JobId)
-	// 	key := "messaage_queue:job_id:" + msg.JobId
-	// 	if err := w.cache.Set(ctx, key, "processing", 5*time.Minute); err != nil {
-	// 		//
-	// 		return
-	// 	}
-
-	// 	gifId, err := w.processor.Process(ctx, msg.JobId, msg.Key, msg.Start, msg.End, msg.Width, msg.FPS, msg.Loop)
-	// 	gifKey := "messaage_queue_gif:job_id:" + msg.JobId
-	// 	if err := w.cache.Set(ctx, gifKey, gifKey, 5*time.Minute); err != nil {
-	// 		//
-	// 		return
-	// 	}
-	// 	if err := w.cache.Set(ctx, key, "processing", 5*time.Minute); err != nil {
-	// 		//
-	// 		return
-	// 	}
-	// 	if err != nil {
-	// 		// retries := retryCount(d)
-	// 		slog.Error("video processing failed", "error", err, "retries", msg.Retries, "JobId", msg.JobId)
-
-	// 		// retry
-	// 		if msg.Retries < w.maxRetries {
-	// 			msg.Retries++
-	// 			err := d.Nack(false, true)
-	// 			if err != nil {
-	// 				slog.Error("nack retry failed", "error", err)
-	// 			}
-	// 			return
-	// 		}
-
-	// 		// dead-letter
-	// 		err := d.Nack(false, false)
-	// 		if err != nil {
-	// 			slog.Error("nack dead-letter failed", "error", err)
-	// 		}
-	// 		return
-	// 	} else {
-	// 		if err := w.cache.Set(ctx, key, "completed", 5*time.Minute); err != nil {
-	// 			//
-	// 		}
-	// 		gif := media.Gif{
-	// 			Key:    gifId,
-	// 			UserId: msg.UserID,
-	// 			Url:    w.gifRepo.GetUrl(gifId),
-	// 		}
-
-	// 		if err := w.gifRepo.Create(gif); err != nil {
-	// 			if err := w.cache.Set(ctx, key, "failed", 5*time.Minute); err != nil {
-	// 				//
-	// 			}
-	// 		}
-	// 	}
-
-	// 	err = d.Ack(false)
-	// 	if err != nil {
-	// 		slog.Error("ack failed", "error", err)
-	// 		return
-	// 	}
-
-	// slog.Info("video processed successfully", "JobId", msg.JobId, "gifId", gifId)
-	return nil
+	sem := make(chan struct{}, concurrency)
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("analytic worker shutting down")
+			return nil
+		case d, ok := <-msgs:
+			if !ok {
+				return fmt.Errorf("consumer channel closed")
+			}
+			sem <- struct{}{}
+			go func(d amqp.Delivery) {
+				defer func() {
+					<-sem
+				}()
+				w.handle(ctx, d)
+			}(d)
+		}
+	}
 }
 
-func retryCount(d amqp.Delivery) int {
-	deaths, ok := d.Headers["x-death"].([]interface{})
-	if !ok || len(deaths) == 0 {
-		return 0
+func (w *Worker) handle(ctx context.Context, d amqp.Delivery) {
+	slog.Info("Inside Worker Msg Queue")
+	var msg queue.ClickEvent
+	err := json.Unmarshal(d.Body, &msg)
+	if err != nil {
+		slog.Error("invalid message", "error", err)
+		d.Nack(false, false)
+		return
 	}
-	entry, ok := deaths[0].(amqp.Table)
-	if !ok {
-		return 0
+
+	// to-do
+	// Get country from ip
+
+	device, browser, os := ParseUserAgent(msg.UserAgent)
+	if device == "" || browser == "" || os == "" {
+		//
 	}
-	count, _ := entry["count"].(int64)
-	return int(count)
+
+	found, err := w.urlRepo.GetByShortCode(msg.ShortCode)
+	if err != nil {
+		slog.Error("fetch code failed", "error", err)
+	}
+
+	click := url.Click{
+		UrlId:      found.Id,
+		Referer:    msg.Referer,
+		Country:    "",
+		DeviceType: device,
+		Os:         os,
+		Browser:    browser,
+		ClickedAt:  msg.ClickedAt,
+	}
+
+	err = w.analysisRepo.Create(click)
+	if err != nil {
+		slog.Error("click insert failed", "error", err)
+	}
+
+	if err == nil {
+		err = w.urlRepo.Update(found.Id, msg.ClickedAt)
+		if err != nil {
+			slog.Error("url update failed", "error", err)
+		}
+	}
+
+	if err != nil {
+		// retry
+		if msg.Retries < w.maxRetries {
+			msg.Retries++
+			err := d.Nack(false, true)
+			if err != nil {
+				slog.Error("nack retry failed", "error", err)
+			}
+			return
+		}
+
+		// dead-letter
+		err := d.Nack(false, false)
+		if err != nil {
+			slog.Error("nack dead-letter failed", "error", err)
+		}
+		return
+	}
+
+	err = d.Ack(false)
+	if err != nil {
+		slog.Error("ack failed", "error", err)
+		return
+	}
+
+	slog.Info("analytics processed successfully", "short-code", msg.ShortCode)
+	// return nil
+}
+
+// func retryCount(d amqp.Delivery) int {
+// 	deaths, ok := d.Headers["x-death"].([]interface{})
+// 	if !ok || len(deaths) == 0 {
+// 		return 0
+// 	}
+// 	entry, ok := deaths[0].(amqp.Table)
+// 	if !ok {
+// 		return 0
+// 	}
+// 	count, _ := entry["count"].(int64)
+// 	return int(count)
+// }
+
+func ParseUserAgent(agent string) (device string, browser string, os string) {
+	ua := useragent.Parse(agent)
+
+	switch {
+	case ua.Mobile:
+		device = "Mobile"
+	case ua.Desktop:
+		device = "Desktop"
+	}
+
+	os = ua.OS
+
+	browser = ua.Name
+
+	switch {
+	case device == "":
+		device = "unknown"
+	case browser == "":
+		browser = "unknown"
+	case os == "":
+		os = "unknown"
+	}
+
+	return
 }

@@ -1,68 +1,49 @@
 package url
 
-func (s *service) GetFullURL() {
-	// shortCode := ctx.Param("code")
-	// if shortCode == "" {
-	// 	ctx.JSON(400, gin.H{
-	// 		"error": "Short URL code is required",
-	// 	})
-	// 	return
-	// }
-	// url, err := s.UrlService.GetUrlByCode(shortCode)
+import (
+	"context"
+	"encoding/json"
+	"time"
 
-	// if err != nil {
-	// 	errMsg := "Internal server error"
-	// 	errCode := 500
-	// 	switch err {
-	// 	case utils.ErrUrlNotFound:
-	// 		errMsg, errCode = "URL not found", 404
+	"github.com/labib0x9/short/internal/domain/url"
+)
 
-	// 	case utils.ErrShortCodeExpired:
-	// 		errMsg, errCode = "URL has expired", 410
-	// 	}
+func (s *service) Get(ctx context.Context, code string) (*url.Url, error) {
+	expireKey := "expire:" + code
+	_, err := s.cache.Get(ctx, expireKey)
+	if err == nil {
+		return nil, url.ErrShortCodeExpired
+	}
 
-	// 	ctx.JSON(errCode, gin.H{
-	// 		"error": errMsg,
-	// 	})
-	// 	return
-	// }
+	cacheKey := "short:" + code
+	value, err := s.cache.Get(ctx, code)
+	if err == nil {
+		var cached url.Url
+		if err := json.Unmarshal([]byte(value), &cached); err == nil {
 
-	// ctx.Redirect(301, url.URL)
-}
+			return &cached, nil
+		}
+	}
 
-func (s *service) GetUrlMetadata() {
-	// shortCode := ctx.Param("code")
-	// if shortCode == "" {
-	// 	ctx.JSON(400, gin.H{
-	// 		"error": "Short URL code is required",
-	// 	})
-	// 	return
-	// }
-	// url, err := s.UrlService.GetUrlByCode(shortCode)
+	fetchedUrl, err := s.urlRepo.GetByShortCode(code)
+	if err != nil || fetchedUrl == nil {
+		return nil, err
+	}
 
-	// if err != nil && err != utils.ErrUrlNotFound {
-	// 	errMsg := "Internal server error"
-	// 	errCode := 500
-	// 	switch err {
-	// 	case utils.ErrUrlNotFound:
-	// 		errMsg, errCode = "URL not found", 404
+	duration := 5 * time.Minute
+	if fetchedUrl.ExpireAt != nil {
+		if fetchedUrl.CreatedAt != *fetchedUrl.ExpireAt && fetchedUrl.ExpireAt.Before(time.Now()) {
+			s.cache.Set(ctx, expireKey, "1", 0)
+			return nil, url.ErrShortCodeCollision
+		}
+		if err == nil {
+			expire := fetchedUrl.ExpireAt.Sub(fetchedUrl.CreatedAt)
+			duration = min(expire, duration)
+		}
+	}
 
-	// 		// case utils.ErrShortCodeExpired:
-	// 		// 	errMsg, errCode = "URL has expired", 410
-	// 	}
+	urlJson, err := json.Marshal(fetchedUrl)
 
-	// 	ctx.JSON(errCode, gin.H{
-	// 		"error": errMsg,
-	// 	})
-	// 	return
-	// }
-
-	// ctx.JSON(200, gin.H{
-	// 	"url": url.URL,
-	// 	"metadata": gin.H{
-	// 		"short_code": shortCode,
-	// 		"created_at": url.CreatedAt,
-	// 		"expire_at":  url.Expire,
-	// 	},
-	// })
+	s.cache.Set(ctx, cacheKey, string(urlJson), duration)
+	return fetchedUrl, err
 }

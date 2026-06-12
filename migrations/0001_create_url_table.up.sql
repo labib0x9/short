@@ -4,6 +4,8 @@ CREATE TABLE urls (
     id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     url        TEXT         NOT NULL,
     short      VARCHAR(20)  NOT NULL UNIQUE,
+    total      BIGINT        DEFAULT 0,
+    last_clicked_at TIMESTAMP,
     created_at    TIMESTAMP     DEFAULT NOW(),
     expire_at  TIMESTAMP
 );
