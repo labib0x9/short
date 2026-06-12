@@ -2,7 +2,7 @@
 
 A URL shortener service written in Go, built with a Domain-Driven Design (DDD) architecture. Uses raw `net/http` (no framework), PostgreSQL for persistence, Redis for caching and rate limiting, and RabbitMQ for async click analytics processing.
 
-## Architecture
+## Project Structure
 
 ```
 cmd/short/              → entrypoint & wiring
@@ -94,15 +94,38 @@ GET /:code/stat
 
 ## Click Analytics Pipeline
 
-```
-GET /:code
-  └─ redirect issued immediately
-  └─ ClickEvent published to RabbitMQ (non-blocking)
-       └─ analytics worker consumes event
-            └─ parse User-Agent → device / browser / OS
-            └─ insert into clicks table
-            └─ increment url.total + update last_clicked_at
-            └─ on failure → retry (up to 2x) → dead-letter queue
+```mermaid
+sequenceDiagram
+    participant User
+    participant API as URL Service
+    participant MQ as RabbitMQ
+    participant Worker as Analytics Worker
+    participant DB as PostgreSQL
+
+    User->>API: GET /:code
+    API-->>User: 302 Redirect
+
+    API->>MQ: Publish ClickEvent (async)
+
+    MQ->>Worker: Consume ClickEvent
+
+    Worker->>Worker: Parse User-Agent
+    Note right of Worker: Detect browser,\ndevice, OS
+
+    Worker->>DB: Insert click record
+    Worker->>DB: Increment total clicks
+    Worker->>DB: Update last_clicked_at
+
+    alt Success
+        DB-->>Worker: OK
+    else Failure
+        Worker->>MQ: Retry (max 2x)
+        MQ->>Worker: Requeue event
+
+        alt Retry limit exceeded
+            Worker->>MQ: Dead Letter Queue
+        end
+    end
 ```
 
 The worker runs with configurable concurrency (default 10) using a semaphore pattern, and uses manual acknowledgement (`autoAck: false`) so no clicks are lost on crash.
@@ -172,3 +195,6 @@ Global middleware is applied in FCFS order via the `middleware.Manager`:
 - Proper error handling
 - Upgrade token bucket rate limiting to sliding window
 - Seperate migration from startup
+- Dockerize the entire app
+- Follow ACID Principle on database query
+- Query optimization
