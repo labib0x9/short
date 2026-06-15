@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/labib0x9/short/internal/infra/queue"
+	"github.com/labib0x9/short/internal/domain/queue"
 )
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -24,12 +24,14 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, url.URL, http.StatusFound)
 
-	h.queue.Publish(r.Context(), queue.ClickEvent{
+	if err := h.queue.PublishAnalytics(r.Context(), queue.ClickEvent{
 		ShortCode: code,
 		ClickedAt: time.Now(),
 		Referer:   r.Referer(),
 		UserAgent: r.UserAgent(),
 		IP:        r.RemoteAddr,
 		Retries:   2,
-	})
+	}); err != nil {
+		// what to do??
+	}
 }

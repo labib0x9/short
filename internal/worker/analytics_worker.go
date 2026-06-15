@@ -3,200 +3,111 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 
-	"github.com/labib0x9/short/internal/domain/url"
-	"github.com/labib0x9/short/internal/infra/cache"
-	"github.com/labib0x9/short/internal/infra/queue"
-	"github.com/labib0x9/short/internal/infra/rabbitmq"
-	"github.com/mileusna/useragent"
+	"github.com/labib0x9/short/internal/app/url"
+	"github.com/labib0x9/short/internal/domain/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type deliveryWrapper struct {
+	d amqp.Delivery
+}
+
+func (w *deliveryWrapper) Body() []byte {
+	return w.d.Body
+}
+
+func (w *deliveryWrapper) Ack(multiple bool) error {
+	return w.d.Ack(multiple)
+}
+
+func (w *deliveryWrapper) Nack(multiple bool, requeue bool) error {
+	return w.d.Nack(multiple, requeue)
+}
+
+func (w *deliveryWrapper) Reject(requeue bool) error {
+	return w.d.Reject(requeue)
+}
+
 type Worker struct {
-	client       *rabbitmq.RabbitMQ
-	urlRepo      url.UrlRepository
-	analysisRepo url.AnalyticsRepository
-	cache        cache.CacheRepo
-	maxRetries   int
+	queue      queue.Queue
+	srv        url.Service
+	maxRetries int
 }
 
 func NewWorker(
-	client *rabbitmq.RabbitMQ,
-	urlRepo url.UrlRepository,
-	analysisRepo url.AnalyticsRepository,
-	cacheRepo cache.CacheRepo,
+	queue queue.Queue,
+	srv url.Service,
 ) *Worker {
 	return &Worker{
-		client:       client,
-		maxRetries:   2,
-		cache:        cacheRepo,
-		urlRepo:      urlRepo,
-		analysisRepo: analysisRepo,
+		queue:      queue,
+		srv:        srv,
+		maxRetries: 2,
 	}
 }
 
-func (w *Worker) Run(ctx context.Context, concurrency int) error {
-
-	// dedicated consumer channel
-	ch, err := w.client.Channel()
+// name = worker/consumer identifier
+func (w *Worker) Run(ctx context.Context, name string, concurrency int) error {
+	msgs, err := w.queue.ConsumeAnalytics(ctx, name, concurrency)
 	if err != nil {
-		return fmt.Errorf("open channel: %w", err)
+		return err
 	}
-	defer ch.Close()
+	defer w.queue.CloseConsumerChannel(name)
 
-	// limit unacked messages
-	err = ch.Qos(concurrency, 0, false)
-	if err != nil {
-		return fmt.Errorf("qos: %w", err)
-	}
-
-	msgs, err := ch.Consume(
-		rabbitmq.Queue,
-		"analytics-worker",
-		false, // auto ack
-		false, // exclusive
-		false, // no local
-		false, // no wait
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("consume: %w", err)
-	}
-
-	slog.Info("analytics worker started", "concurrency", concurrency)
+	slog.Info("Analytics worker started", "Concurrency", concurrency)
 
 	sem := make(chan struct{}, concurrency)
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("analytic worker shutting down")
+			slog.Info("Analytics worker shutting down")
 			return nil
 		case d, ok := <-msgs:
 			if !ok {
-				return fmt.Errorf("consumer channel closed")
+				return queue.ErrConsumerChannelClosed
 			}
 			sem <- struct{}{}
 			go func(d amqp.Delivery) {
 				defer func() {
 					<-sem
 				}()
-				w.handle(ctx, d)
+				w.handle(ctx, &deliveryWrapper{d: d})
 			}(d)
 		}
 	}
 }
 
-func (w *Worker) handle(ctx context.Context, d amqp.Delivery) {
-	slog.Info("Inside Worker Msg Queue")
+func (w *Worker) handle(ctx context.Context, d queue.Delivery) {
 	var msg queue.ClickEvent
-	err := json.Unmarshal(d.Body, &msg)
+	err := json.Unmarshal(d.Body(), &msg)
 	if err != nil {
-		slog.Error("invalid message", "error", err)
+		slog.Error("handler() Json read failed", "error", err)
 		d.Nack(false, false)
 		return
 	}
 
-	// to-do
-	// Get country from ip
-
-	device, browser, os := ParseUserAgent(msg.UserAgent)
-	if device == "" || browser == "" || os == "" {
-		//
-	}
-
-	found, err := w.urlRepo.GetByShortCode(msg.ShortCode)
-	if err != nil {
-		slog.Error("fetch code failed", "error", err)
-	}
-
-	click := url.Click{
-		UrlId:      found.Id,
-		Referer:    msg.Referer,
-		Country:    "",
-		DeviceType: device,
-		Os:         os,
-		Browser:    browser,
-		ClickedAt:  msg.ClickedAt,
-	}
-
-	err = w.analysisRepo.Create(click)
-	if err != nil {
-		slog.Error("click insert failed", "error", err)
-	}
-
-	if err == nil {
-		err = w.urlRepo.Update(found.Id, msg.ClickedAt)
-		if err != nil {
-			slog.Error("url update failed", "error", err)
-		}
-	}
+	err = w.srv.Save(ctx, msg)
 
 	if err != nil {
-		// retry
 		if msg.Retries < w.maxRetries {
 			msg.Retries++
-			err := d.Nack(false, true)
-			if err != nil {
-				slog.Error("nack retry failed", "error", err)
+			if err := d.Nack(false, true); err != nil {
+				slog.Error("handle() Requeue failed", "code", msg.ShortCode, "error", err)
 			}
 			return
 		}
 
-		// dead-letter
-		err := d.Nack(false, false)
-		if err != nil {
-			slog.Error("nack dead-letter failed", "error", err)
+		if err := d.Nack(false, false); err != nil {
+			slog.Error("handle() Queue to DLQ failed", "code", msg.ShortCode, "error", err)
 		}
 		return
 	}
 
-	err = d.Ack(false)
-	if err != nil {
-		slog.Error("ack failed", "error", err)
+	if err = d.Ack(false); err != nil {
+		slog.Error("handle() Ack send failed", "code", msg.ShortCode, "error", err)
 		return
 	}
 
-	slog.Info("analytics processed successfully", "short-code", msg.ShortCode)
-	// return nil
-}
-
-// func retryCount(d amqp.Delivery) int {
-// 	deaths, ok := d.Headers["x-death"].([]interface{})
-// 	if !ok || len(deaths) == 0 {
-// 		return 0
-// 	}
-// 	entry, ok := deaths[0].(amqp.Table)
-// 	if !ok {
-// 		return 0
-// 	}
-// 	count, _ := entry["count"].(int64)
-// 	return int(count)
-// }
-
-func ParseUserAgent(agent string) (device string, browser string, os string) {
-	ua := useragent.Parse(agent)
-
-	switch {
-	case ua.Mobile:
-		device = "Mobile"
-	case ua.Desktop:
-		device = "Desktop"
-	}
-
-	os = ua.OS
-
-	browser = ua.Name
-
-	switch {
-	case device == "":
-		device = "unknown"
-	case browser == "":
-		browser = "unknown"
-	case os == "":
-		os = "unknown"
-	}
-
-	return
+	slog.Info("analytics-worker processed successfully", "code", msg.ShortCode)
 }

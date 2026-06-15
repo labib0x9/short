@@ -38,14 +38,14 @@ func main() {
 
 	// middlewares := middleware.NewMiddlewares(cacheRepo)
 
-	worker := worker.NewWorker(rabbitMq, urlRepo, analysisRepo, cacheRepo)
+	urlService := urlapp.NewService(urlRepo, analysisRepo, cacheRepo, cnf)
+
+	worker := worker.NewWorker(rabbitMq, urlService)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	go worker.Run(ctx, 10)
-
-	urlService := urlapp.NewService(urlRepo, analysisRepo, cacheRepo, cnf)
+	go worker.Run(ctx, "analytics-worker", 10)
 
 	validate := validator.New()
 	staticHandler := static.NewHandler()
