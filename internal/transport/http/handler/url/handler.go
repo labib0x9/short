@@ -3,7 +3,7 @@ package url
 import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labib0x9/short/internal/app/url"
-	"github.com/labib0x9/short/internal/infra/queue"
+	"github.com/labib0x9/short/internal/domain/queue"
 )
 
 type Handler struct {

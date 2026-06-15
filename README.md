@@ -9,14 +9,14 @@ cmd/short/              → entrypoint & wiring
 config/                 → environment config
 internal/
   domain/               → entities, repository interfaces, domain errors
-    url/           
+    url/
+    queue/              → queue interface & ClickEvent entity           
   app/                  → application services
     url/              
   infra/
     postgres/           → PostgreSQL repository implementations
     redis/              → Redis client, cache repo implementation, rate limiter Lua script
-    rabbitmq/           → RabbitMQ connection, publisher
-    queue/              → queue interface & ClickEvent entity
+    rabbitmq/           → RabbitMQ connection, publisher, consumer
     cache/              → cache interface
   transport/
     http/               → server, middleware manager, route handlers

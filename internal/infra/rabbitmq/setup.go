@@ -5,89 +5,112 @@ import (
 	"log/slog"
 
 	"github.com/labib0x9/short/config"
+	"github.com/labib0x9/short/internal/domain/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 var (
-	Queue = "analytics.queue"
+	AnalyticQueue     = "analytics.queue"
+	AnalyticQueueDead = "analytics.queue.dead"
 )
 
-type RabbitMQ struct {
-	conn *amqp.Connection
+type rabbitMQ struct {
+	conn       *amqp.Connection
+	consumerCh map[string]*amqp.Channel // for each consumer a dedicated channel
 }
 
-func NewRabbitMQ(cnf *config.RabbitMq) *RabbitMQ {
+func NewRabbitMQ(cnf *config.RabbitMq) queue.Queue {
 	url := fmt.Sprintf("amqp://%s:%s@%s/", cnf.User, cnf.Pass, cnf.Addr)
 	conn, err := amqp.Dial(url)
 	if err != nil {
 		panic(fmt.Errorf("rabbitmq dial: %w, url=%s", err, url))
-		return nil
 	}
 
-	r := &RabbitMQ{
-		conn: conn,
+	r := rabbitMQ{
+		conn:       conn,
+		consumerCh: make(map[string]*amqp.Channel),
 	}
 
 	if err := r.setup(); err != nil {
 		conn.Close()
 		panic(err)
-		return nil
 	}
 
-	slog.Info("rabbitmq connected")
+	slog.Info("rabbitMq connection complete")
 
-	return r
+	return &r
 }
 
-func (r *RabbitMQ) setup() error {
-	ch, err := r.conn.Channel()
+func (r *rabbitMQ) setup() error {
+	ch, err := r.channel()
 	if err != nil {
-		return fmt.Errorf("setup channel: %w", err)
+		return fmt.Errorf("%v: %w", queue.ErrOpeningChannel, err)
 	}
 	defer ch.Close()
 
-	// dead letter queues
-
-	_, err = ch.QueueDeclare(
-		"analytics.queue.dead",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
+	err = r.declareAnalyticQueueDead(ch)
 	if err != nil {
-		return fmt.Errorf("declare email dlq: %w", err)
+		return fmt.Errorf("%v: %w", queue.ErrDeclareQueue, err)
 	}
 
-	// main queues
+	err = r.declareAnalyticQueue(ch)
+	if err != nil {
+		return fmt.Errorf("%v: %w", queue.ErrDeclareQueue, err)
+	}
 
-	_, err = ch.QueueDeclare(
-		Queue,
+	return nil
+}
+
+func (r *rabbitMQ) declareAnalyticQueue(ch *amqp.Channel) error {
+	_, err := ch.QueueDeclare(
+		AnalyticQueue,
 		true,
 		false,
 		false,
 		false,
 		amqp.Table{
 			"x-dead-letter-exchange":    "",
-			"x-dead-letter-routing-key": "email.queue.dead",
+			"x-dead-letter-routing-key": AnalyticQueueDead,
 		},
 	)
-	if err != nil {
-		return fmt.Errorf("declare email queue: %w", err)
-	}
-
-	return nil
+	return err
 }
 
-func (r *RabbitMQ) Channel() (*amqp.Channel, error) {
+func (r *rabbitMQ) declareAnalyticQueueDead(ch *amqp.Channel) error {
+	_, err := ch.QueueDeclare(
+		AnalyticQueueDead,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	return err
+}
+
+func (r *rabbitMQ) channel() (*amqp.Channel, error) {
 	return r.conn.Channel()
 }
 
-func (r *RabbitMQ) Close() error {
+func (r *rabbitMQ) CloseConsumerChannel(name string) error {
+	err := r.consumerCh[name].Close()
+	if err != nil {
+		return err
+	}
+	delete(r.consumerCh, name)
+	return nil
+}
+
+func (r *rabbitMQ) Close() error {
+
+	for _, ch := range r.consumerCh {
+		if ch != nil {
+			ch.Close()
+		}
+	}
+
 	if r.conn != nil && !r.conn.IsClosed() {
 		return r.conn.Close()
 	}
-
 	return nil
 }

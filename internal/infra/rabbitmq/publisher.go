@@ -7,24 +7,25 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/labib0x9/short/internal/infra/queue"
+	queuedomain "github.com/labib0x9/short/internal/domain/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func (r *RabbitMQ) publish(ctx context.Context, queue string, payload any) error {
+var (
+	defaultExchange = ""
+)
 
-	// create fresh channel per publish
-	// safer than shared channel
-
-	ch, err := r.conn.Channel()
+// queue = Queue name to publish msg
+func (r *rabbitMQ) publish(ctx context.Context, queue string, msg any) error {
+	ch, err := r.channel()
 	if err != nil {
-		return fmt.Errorf("open channel: %w", err)
+		return fmt.Errorf("%v: %w", queuedomain.ErrOpeningChannel, err)
 	}
 	defer ch.Close()
 
-	body, err := json.Marshal(payload)
+	body, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("marshal payload: %w", err)
+		return fmt.Errorf("%v: %w", queuedomain.ErrMessageEncodingFailed, err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -32,7 +33,7 @@ func (r *RabbitMQ) publish(ctx context.Context, queue string, payload any) error
 
 	err = ch.PublishWithContext(
 		ctx,
-		"", // default exchange
+		defaultExchange,
 		queue,
 		false,
 		false,
@@ -45,13 +46,13 @@ func (r *RabbitMQ) publish(ctx context.Context, queue string, payload any) error
 	)
 
 	if err != nil {
-		return fmt.Errorf("publish message: %w", err)
+		return fmt.Errorf("%v: %w", queuedomain.ErrPublishMessageFailed, err)
 	}
 
-	slog.Info("publish() = message published", "queue", queue)
+	slog.Info("Message Published", "Queue:", queue)
 	return nil
 }
 
-func (r *RabbitMQ) Publish(ctx context.Context, msg queue.ClickEvent) error {
-	return r.publish(ctx, Queue, msg)
+func (r *rabbitMQ) PublishAnalytics(ctx context.Context, msg queuedomain.ClickEvent) error {
+	return r.publish(ctx, AnalyticQueue, msg)
 }

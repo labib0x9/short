@@ -135,9 +135,13 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
   }
   .options-row label { color: var(--muted); font-size: 12px; }
-  .date-input {
+
+  /* date + time inputs (split, instead of datetime-local) */
+  .date-input,
+  .time-input {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -148,8 +152,12 @@
     outline: none;
     transition: border-color 0.15s;
   }
-  .date-input:focus { border-color: var(--accent); color: var(--text); }
-  .date-input::-webkit-calendar-picker-indicator { filter: invert(0.4); cursor: pointer; }
+  .date-input { min-width: 140px; }
+  .time-input { min-width: 110px; }
+  .date-input:focus,
+  .time-input:focus { border-color: var(--accent); color: var(--text); }
+  .date-input::-webkit-calendar-picker-indicator,
+  .time-input::-webkit-calendar-picker-indicator { filter: invert(0.4); cursor: pointer; }
 
   /* result box */
   .result-box {
@@ -342,6 +350,7 @@
     .stat-card.full { grid-column: 1; }
     footer { padding: 16px 20px; flex-wrap: wrap; gap: 12px; }
     .big-number { font-size: 32px; }
+    .date-input, .time-input { flex: 1; min-width: 0; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -377,8 +386,9 @@
       <button class="btn" id="shorten-btn">shorten →</button>
     </div>
     <div class="options-row">
-      <label for="expire-input">expire at</label>
-      <input class="date-input" id="expire-input" type="datetime-local" />
+      <label for="expire-date-input">expire at</label>
+      <input class="date-input" id="expire-date-input" type="date" />
+      <input class="time-input" id="expire-time-input" type="time" />
       <button class="btn btn-ghost" id="clear-expire" style="padding:7px 12px;font-size:11px;">clear</button>
     </div>
 
@@ -534,7 +544,8 @@
   let lastCode = '';
 
   document.getElementById('clear-expire').addEventListener('click', () => {
-    document.getElementById('expire-input').value = '';
+    document.getElementById('expire-date-input').value = '';
+    document.getElementById('expire-time-input').value = '';
   });
 
   document.getElementById('url-input').addEventListener('keydown', e => {
@@ -542,10 +553,11 @@
   });
 
   document.getElementById('shorten-btn').addEventListener('click', async () => {
-    const urlVal  = document.getElementById('url-input').value.trim();
-    const expireVal = document.getElementById('expire-input').value;
-    const btn     = document.getElementById('shorten-btn');
-    const errEl   = document.getElementById('shorten-error');
+    const urlVal    = document.getElementById('url-input').value.trim();
+    const dateVal   = document.getElementById('expire-date-input').value; // YYYY-MM-DD
+    const timeVal   = document.getElementById('expire-time-input').value; // HH:MM
+    const btn       = document.getElementById('shorten-btn');
+    const errEl     = document.getElementById('shorten-error');
     const resultBox = document.getElementById('result-box');
 
     hideError(errEl);
@@ -557,7 +569,18 @@
     }
 
     const body = { url: urlVal };
-    if (expireVal) body.expire_at = new Date(expireVal).toISOString();
+
+    // Combine date + time into a single ISO timestamp.
+    // If only the date is set, default the time to 00:00.
+    if (dateVal) {
+      const combined = `${dateVal}T${timeVal || '00:00'}`;
+      const parsed = new Date(combined);
+      if (isNaN(parsed.getTime())) {
+        showError(errEl, 'invalid expiry date/time');
+        return;
+      }
+      body.expire_at = parsed.toISOString();
+    }
 
     setLoading(btn, true);
     try {
