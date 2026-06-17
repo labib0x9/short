@@ -2,21 +2,21 @@ package middleware
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/labib0x9/short/internal/infra/redis"
+	"github.com/labib0x9/short/internal/domain/cache"
 )
 
 type RateLimiter struct {
-	Client   *redis.Redis
+	Client   cache.RateLimiter
 	Rate     int
 	Capacity int
 }
 
-type Result struct {
+type rateLimitResult struct {
 	allowed     bool
 	wait_ms     int64
 	token       int
@@ -24,12 +24,12 @@ type Result struct {
 }
 
 func NewRateLimiter(
-	redisClient *redis.Redis,
+	client cache.RateLimiter,
 	rate int,
 	capacity int,
 ) *RateLimiter {
 	return &RateLimiter{
-		Client:   redisClient,
+		Client:   client,
 		Rate:     rate,
 		Capacity: capacity,
 	}
@@ -38,7 +38,12 @@ func NewRateLimiter(
 func (rl *RateLimiter) Limit() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := strings.Split(r.RemoteAddr, ":")[0]
+			ip, err := getIP(r.RemoteAddr)
+			if err != nil {
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+
 			key := "rate_limit:ip:" + ip
 			res, err := rl.setLimit(r.Context(), key)
 			if err != nil {
@@ -61,19 +66,12 @@ func (rl *RateLimiter) Limit() Middleware {
 	}
 }
 
-func (rl *RateLimiter) setLimit(ctx context.Context, key string) (Result, error) {
+func (rl *RateLimiter) setLimit(ctx context.Context, key string) (rateLimitResult, error) {
 	now := time.Now().UnixMilli()
-	res, err := rl.Client.Script.Run(
-		ctx,
-		rl.Client.Client,
-		[]string{key},
-		rl.Capacity,
-		rl.Rate,
-		now,
-	).Result()
 
+	res, err := rl.Client.RunScript(ctx, key, rl.Capacity, rl.Rate, now)
 	if err != nil {
-		return Result{}, err
+		return rateLimitResult{}, err
 	}
 
 	data := res.([]interface{})
@@ -81,10 +79,15 @@ func (rl *RateLimiter) setLimit(ctx context.Context, key string) (Result, error)
 	wait_ms := data[1].(int64)
 	token := data[2].(int64)
 
-	return Result{
+	return rateLimitResult{
 		allowed:     allowed == 1,
 		wait_ms:     wait_ms,
 		last_refill: now,
 		token:       int(token),
 	}, nil
+}
+
+func getIP(addr string) (string, error) {
+	host, _, err := net.SplitHostPort(addr)
+	return host, err
 }
