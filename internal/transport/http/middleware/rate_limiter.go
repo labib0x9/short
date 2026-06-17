@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/labib0x9/short/internal/infra/redis"
+	"github.com/labib0x9/short/internal/domain/cache"
 )
 
 type RateLimiter struct {
-	Client   *redis.Redis
+	Client   cache.RateLimiter
 	Rate     int
 	Capacity int
 }
 
-type Result struct {
+type rateLimitResult struct {
 	allowed     bool
 	wait_ms     int64
 	token       int
@@ -24,12 +24,12 @@ type Result struct {
 }
 
 func NewRateLimiter(
-	redisClient *redis.Redis,
+	client cache.RateLimiter,
 	rate int,
 	capacity int,
 ) *RateLimiter {
 	return &RateLimiter{
-		Client:   redisClient,
+		Client:   client,
 		Rate:     rate,
 		Capacity: capacity,
 	}
@@ -61,19 +61,12 @@ func (rl *RateLimiter) Limit() Middleware {
 	}
 }
 
-func (rl *RateLimiter) setLimit(ctx context.Context, key string) (Result, error) {
+func (rl *RateLimiter) setLimit(ctx context.Context, key string) (rateLimitResult, error) {
 	now := time.Now().UnixMilli()
-	res, err := rl.Client.Script.Run(
-		ctx,
-		rl.Client.Client,
-		[]string{key},
-		rl.Capacity,
-		rl.Rate,
-		now,
-	).Result()
 
+	res, err := rl.Client.RunScript(ctx, key, rl.Capacity, rl.Rate, now)
 	if err != nil {
-		return Result{}, err
+		return rateLimitResult{}, err
 	}
 
 	data := res.([]interface{})
@@ -81,7 +74,7 @@ func (rl *RateLimiter) setLimit(ctx context.Context, key string) (Result, error)
 	wait_ms := data[1].(int64)
 	token := data[2].(int64)
 
-	return Result{
+	return rateLimitResult{
 		allowed:     allowed == 1,
 		wait_ms:     wait_ms,
 		last_refill: now,

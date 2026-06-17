@@ -12,6 +12,8 @@ import (
 	"github.com/labib0x9/short/internal/infra/postgres"
 	"github.com/labib0x9/short/internal/infra/rabbitmq"
 	"github.com/labib0x9/short/internal/infra/redis"
+	redis_cache "github.com/labib0x9/short/internal/infra/redis/cache"
+	ratelimitter "github.com/labib0x9/short/internal/infra/redis/rate_limitter"
 	rest "github.com/labib0x9/short/internal/transport/http"
 	"github.com/labib0x9/short/internal/transport/http/handler/static"
 	"github.com/labib0x9/short/internal/transport/http/handler/url"
@@ -34,7 +36,8 @@ func main() {
 
 	urlRepo := postgres.NewUrlRepository(dbConn)
 	analysisRepo := postgres.NewAnalysisRepository(dbConn)
-	cacheRepo := redis.NewCacheRepo(redisClient)
+	cacheRepo := redis_cache.NewCache(redisClient)
+	rateLimiter := ratelimitter.NewRateLimiter(redisClient)
 
 	// middlewares := middleware.NewMiddlewares(cacheRepo)
 
@@ -54,7 +57,7 @@ func main() {
 	server := rest.NewServer(urlHandler, staticHandler)
 
 	go func() {
-		server.Start(redisClient, cnf)
+		server.Start(rateLimiter, cnf)
 	}()
 
 	<-ctx.Done()

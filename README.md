@@ -10,14 +10,16 @@ config/                 → environment config
 internal/
   domain/               → entities, repository interfaces, domain errors
     url/
-    queue/              → queue interface & ClickEvent entity           
+    queue/              → queue interface & ClickEvent entity
+    cache/              → cache interface
   app/                  → application services
     url/              
   infra/
     postgres/           → PostgreSQL repository implementations
-    redis/              → Redis client, cache repo implementation, rate limiter Lua script
+    redis/              → Redis client
+      cache/            → Cache repo implementation
+      rate_limitter/    → Rate limiter repo implementation and Lua script
     rabbitmq/           → RabbitMQ connection, publisher, consumer
-    cache/              → cache interface
   transport/
     http/               → server, middleware manager, route handlers
   worker/               → async analytics consumer (RabbitMQ)

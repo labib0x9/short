@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/labib0x9/short/config"
-	"github.com/labib0x9/short/internal/infra/redis"
+	"github.com/labib0x9/short/internal/domain/cache"
 	"github.com/labib0x9/short/internal/transport/http/handler/static"
 	"github.com/labib0x9/short/internal/transport/http/handler/url"
 	"github.com/labib0x9/short/internal/transport/http/middleware"
@@ -25,9 +25,9 @@ func NewServer(urlHandler *url.Handler, staticHandler *static.Handler) Server {
 	}
 }
 
-func (s *Server) Start(redisClient *redis.Redis, cnf *config.Config) {
+func (s *Server) Start(limiter cache.RateLimiter, cnf *config.Config) {
 
-	rateLimiter := middleware.NewRateLimiter(redisClient, 5, 10)
+	rateLimiter := middleware.NewRateLimiter(limiter, 5, 10)
 
 	manager := middleware.NewManager()
 	manager.Use(
