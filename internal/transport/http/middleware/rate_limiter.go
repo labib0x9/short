@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/labib0x9/short/internal/domain/cache"
@@ -38,7 +38,12 @@ func NewRateLimiter(
 func (rl *RateLimiter) Limit() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := strings.Split(r.RemoteAddr, ":")[0]
+			ip, err := getIP(r.RemoteAddr)
+			if err != nil {
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+
 			key := "rate_limit:ip:" + ip
 			res, err := rl.setLimit(r.Context(), key)
 			if err != nil {
@@ -80,4 +85,9 @@ func (rl *RateLimiter) setLimit(ctx context.Context, key string) (rateLimitResul
 		last_refill: now,
 		token:       int(token),
 	}, nil
+}
+
+func getIP(addr string) (string, error) {
+	host, _, err := net.SplitHostPort(addr)
+	return host, err
 }
