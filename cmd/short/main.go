@@ -24,9 +24,8 @@ func main() {
 
 	cnf := config.GetConfig()
 
-	postgresConn := postgres.New()
-	dbConn := postgresConn.SetupAndConnection(cnf.PostgreSQL)
-	defer dbConn.Close()
+	pgConn := postgres.NewPostgresConn(cnf.PostgreSQL)
+	defer pgConn.Close()
 
 	redisClient := redis.Setup(cnf.Redis)
 	defer redisClient.Close()
@@ -34,8 +33,8 @@ func main() {
 	rabbitMq := rabbitmq.NewRabbitMQ(cnf.RabbitMq)
 	defer rabbitMq.Close()
 
-	urlRepo := postgres.NewUrlRepository(dbConn)
-	analysisRepo := postgres.NewAnalysisRepository(dbConn)
+	urlRepo := postgres.NewUrlRepository(pgConn)
+	analysisRepo := postgres.NewAnalysisRepository(pgConn)
 	cacheRepo := redis_cache.NewCache(redisClient)
 	rateLimiter := ratelimitter.NewRateLimiter(redisClient)
 
