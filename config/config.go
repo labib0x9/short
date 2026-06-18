@@ -4,8 +4,14 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/joho/godotenv"
+)
+
+var (
+	configuration *Config
+	once          sync.Once
 )
 
 type PostgreSQL struct {
@@ -43,8 +49,6 @@ type Config struct {
 	Redis      *Redis
 	RabbitMq   *RabbitMq
 }
-
-var configuration *Config
 
 func loadConfig() {
 	if err := godotenv.Load(".env"); err != nil {
@@ -174,8 +178,8 @@ func loadConfig() {
 }
 
 func GetConfig() *Config {
-	if configuration == nil {
+	once.Do(func() {
 		loadConfig()
-	}
+	})
 	return configuration
 }
