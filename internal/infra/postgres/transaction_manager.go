@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labib0x9/short/internal/domain/db"
@@ -20,7 +21,9 @@ func NewTxManager(db *sqlx.DB) db.TxManager {
 }
 
 func (t *txManager) With(ctx context.Context, fn func(ctx context.Context) error) error {
-	tx, err := t.db.BeginTxx(ctx, nil)
+	tx, err := t.db.BeginTxx(ctx, &sql.TxOptions{
+		Isolation: sql.LevelRepeatableRead,
+	})
 	if err != nil {
 		return err
 	}
