@@ -39,8 +39,9 @@ func main() {
 	rateLimiter := ratelimitter.NewRateLimiter(redisClient)
 
 	// middlewares := middleware.NewMiddlewares(cacheRepo)
+	txMngr := postgres.NewTxManager(pgConn)
 
-	urlService := urlapp.NewService(urlRepo, analysisRepo, cacheRepo, cnf)
+	urlService := urlapp.NewService(urlRepo, analysisRepo, txMngr, cacheRepo, cnf)
 
 	worker := worker.NewWorker(rabbitMq, urlService)
 

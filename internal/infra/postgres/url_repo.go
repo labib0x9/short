@@ -9,6 +9,9 @@ import (
 	"github.com/labib0x9/short/internal/domain/url"
 )
 
+// every operation can run with transaction
+// if there is no transaction, fallback to default db
+
 type urlRepo struct {
 	db *sqlx.DB
 }
@@ -20,12 +23,13 @@ func NewUrlRepository(db *sqlx.DB) url.UrlRepository {
 }
 
 func (u *urlRepo) Create(ctx context.Context, url url.Url) error {
+	db := getDBFromCtx(ctx, u.db)
 	query := `insert into 
 		urls(url, short, expire_at)
 		values(:url, :short, :expire_at)
 	`
 
-	rows, err := u.db.NamedQueryContext(ctx, query, url)
+	rows, err := sqlx.NamedQueryContext(ctx, db, query, url)
 	if err != nil {
 		return err
 	}
@@ -35,33 +39,36 @@ func (u *urlRepo) Create(ctx context.Context, url url.Url) error {
 }
 
 func (u *urlRepo) GetByShortCode(ctx context.Context, shortCode string) (*url.Url, error) {
+	db := getDBFromCtx(ctx, u.db)
 	query := `select * from urls where short = $1`
 	var found url.Url
-	if err := u.db.GetContext(ctx, &found, query, shortCode); err != nil {
+	if err := sqlx.GetContext(ctx, db, &found, query, shortCode); err != nil {
 		return nil, err
 	}
 	return &found, nil
 }
 
 func (u *urlRepo) Update(ctx context.Context, id uuid.UUID, lastClickedAt time.Time) error {
+	db := getDBFromCtx(ctx, u.db)
 	query := `
 		update urls
 		set
 			last_clicked_at = $1,
 			total = COALESCE(total, 0) + 1
 		where id = $2`
-	_, err := u.db.ExecContext(ctx, query, lastClickedAt, id)
+	_, err := db.ExecContext(ctx, query, lastClickedAt, id)
 	return err
 }
 
 func (u *urlRepo) GetMetadata(ctx context.Context, code string) (*url.Url, error) {
+	db := getDBFromCtx(ctx, u.db)
 	query := `
 		select
 			id, total, last_clicked_at, created_at, expire_at
 		from urls
 		where short = $1`
 	var found url.Url
-	if err := u.db.GetContext(ctx, &found, query, code); err != nil {
+	if err := sqlx.GetContext(ctx, db, &found, query, code); err != nil {
 		return nil, err
 	}
 	return &found, nil
@@ -78,12 +85,15 @@ func NewAnalysisRepository(db *sqlx.DB) url.AnalyticsRepository {
 }
 
 func (a *analysisRepo) Create(ctx context.Context, click url.Click) error {
+	db := getDBFromCtx(ctx, a.db)
 	query := `insert into 
 		clicks(url_id, referer, country, device, os, browser, clicked_at)
 		values(:url_id, :referer, :country, :device, :os, :browser, :clicked_at)
 	`
 
-	rows, err := a.db.NamedQueryContext(ctx, query, click)
+	// db.ExecContext()
+	rows, err := sqlx.NamedQueryContext(ctx, db, query, click)
+
 	if err != nil {
 		return err
 	}
@@ -93,6 +103,7 @@ func (a *analysisRepo) Create(ctx context.Context, click url.Click) error {
 }
 
 func (a *analysisRepo) GetBrowserCount(ctx context.Context, Id uuid.UUID) (map[string]int64, error) {
+	db := getDBFromCtx(ctx, a.db)
 	result := map[string]int64{}
 	query := `
 		select
@@ -102,7 +113,7 @@ func (a *analysisRepo) GetBrowserCount(ctx context.Context, Id uuid.UUID) (map[s
 		where url_id = $1
 		group by browser
 	`
-	rows, err := a.db.QueryContext(ctx, query, Id)
+	rows, err := db.QueryContext(ctx, query, Id)
 	if err != nil {
 		return result, err
 	}
@@ -117,6 +128,7 @@ func (a *analysisRepo) GetBrowserCount(ctx context.Context, Id uuid.UUID) (map[s
 }
 
 func (a *analysisRepo) GetDeviceCount(ctx context.Context, Id uuid.UUID) (map[string]int64, error) {
+	db := getDBFromCtx(ctx, a.db)
 	result := map[string]int64{}
 	query := `
 		select
@@ -126,7 +138,7 @@ func (a *analysisRepo) GetDeviceCount(ctx context.Context, Id uuid.UUID) (map[st
 		where url_id = $1
 		group by device
 	`
-	rows, err := a.db.QueryContext(ctx, query, Id)
+	rows, err := db.QueryContext(ctx, query, Id)
 	if err != nil {
 		return result, err
 	}
@@ -141,6 +153,7 @@ func (a *analysisRepo) GetDeviceCount(ctx context.Context, Id uuid.UUID) (map[st
 }
 
 func (a *analysisRepo) GetOSCount(ctx context.Context, Id uuid.UUID) (map[string]int64, error) {
+	db := getDBFromCtx(ctx, a.db)
 	result := map[string]int64{}
 	query := `
 		select
@@ -150,7 +163,7 @@ func (a *analysisRepo) GetOSCount(ctx context.Context, Id uuid.UUID) (map[string
 		where url_id = $1
 		group by os
 	`
-	rows, err := a.db.QueryContext(ctx, query, Id)
+	rows, err := db.QueryContext(ctx, query, Id)
 	if err != nil {
 		return result, err
 	}
