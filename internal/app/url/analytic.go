@@ -1,25 +1,29 @@
 package url
 
-import "github.com/labib0x9/short/internal/domain/url"
+import (
+	"context"
 
-func (s *service) Analysis(code string) (url.Analysis, error) {
+	"github.com/labib0x9/short/internal/domain/url"
+)
 
-	foundUrl, err := s.urlRepo.GetMetadata(code)
+func (s *service) Analysis(ctx context.Context, code string) (url.Analysis, error) {
+
+	foundUrl, err := s.urlRepo.GetMetadata(ctx, code)
 	if err != nil {
 		return url.Analysis{}, err
 	}
 
-	browser, err := s.analysisRepo.GetBrowserCount(foundUrl.Id)
+	browser, err := s.analysisRepo.GetBrowserCount(ctx, foundUrl.Id)
 	if err != nil {
 		return url.Analysis{}, err
 	}
 
-	device, err := s.analysisRepo.GetDeviceCount(foundUrl.Id)
+	device, err := s.analysisRepo.GetDeviceCount(ctx, foundUrl.Id)
 	if err != nil {
 		return url.Analysis{}, err
 	}
 
-	os, err := s.analysisRepo.GetOSCount(foundUrl.Id)
+	os, err := s.analysisRepo.GetOSCount(ctx, foundUrl.Id)
 	if err != nil {
 		return url.Analysis{}, err
 	}

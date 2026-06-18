@@ -59,11 +59,11 @@ func (m *mockService) Save(ctx context.Context, msg queue.ClickEvent) error {
 	return m.saveErr
 }
 
-func (m *mockService) Shorten(longUrl string, expireAt *time.Time, userAgent string) (url.ShortenResult, error) {
+func (m *mockService) Shorten(ctx context.Context, longUrl string, expireAt *time.Time, userAgent string) (url.ShortenResult, error) {
 	return url.ShortenResult{}, nil
 }
 func (m *mockService) Get(ctx context.Context, code string) (*urldomain.Url, error) { return nil, nil }
-func (m *mockService) Analysis(code string) (urldomain.Analysis, error) {
+func (m *mockService) Analysis(ctx context.Context, code string) (urldomain.Analysis, error) {
 	return urldomain.Analysis{}, nil
 }
 

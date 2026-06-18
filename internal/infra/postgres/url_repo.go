@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,13 +19,13 @@ func NewUrlRepository(db *sqlx.DB) url.UrlRepository {
 	}
 }
 
-func (u *urlRepo) Create(url url.Url) error {
+func (u *urlRepo) Create(ctx context.Context, url url.Url) error {
 	query := `insert into 
 		urls(url, short, expire_at)
 		values(:url, :short, :expire_at)
 	`
 
-	rows, err := u.db.NamedQuery(query, url)
+	rows, err := u.db.NamedQueryContext(ctx, query, url)
 	if err != nil {
 		return err
 	}
@@ -33,34 +34,34 @@ func (u *urlRepo) Create(url url.Url) error {
 	return nil
 }
 
-func (u *urlRepo) GetByShortCode(shortCode string) (*url.Url, error) {
+func (u *urlRepo) GetByShortCode(ctx context.Context, shortCode string) (*url.Url, error) {
 	query := `select * from urls where short = $1`
 	var found url.Url
-	if err := u.db.Get(&found, query, shortCode); err != nil {
+	if err := u.db.GetContext(ctx, &found, query, shortCode); err != nil {
 		return nil, err
 	}
 	return &found, nil
 }
 
-func (u *urlRepo) Update(id uuid.UUID, lastClickedAt time.Time) error {
+func (u *urlRepo) Update(ctx context.Context, id uuid.UUID, lastClickedAt time.Time) error {
 	query := `
 		update urls
 		set
 			last_clicked_at = $1,
 			total = COALESCE(total, 0) + 1
 		where id = $2`
-	_, err := u.db.Exec(query, lastClickedAt, id)
+	_, err := u.db.ExecContext(ctx, query, lastClickedAt, id)
 	return err
 }
 
-func (u *urlRepo) GetMetadata(code string) (*url.Url, error) {
+func (u *urlRepo) GetMetadata(ctx context.Context, code string) (*url.Url, error) {
 	query := `
 		select
 			id, total, last_clicked_at, created_at, expire_at
 		from urls
 		where short = $1`
 	var found url.Url
-	if err := u.db.Get(&found, query, code); err != nil {
+	if err := u.db.GetContext(ctx, &found, query, code); err != nil {
 		return nil, err
 	}
 	return &found, nil
@@ -76,13 +77,13 @@ func NewAnalysisRepository(db *sqlx.DB) url.AnalyticsRepository {
 	}
 }
 
-func (a *analysisRepo) Create(click url.Click) error {
+func (a *analysisRepo) Create(ctx context.Context, click url.Click) error {
 	query := `insert into 
 		clicks(url_id, referer, country, device, os, browser, clicked_at)
 		values(:url_id, :referer, :country, :device, :os, :browser, :clicked_at)
 	`
 
-	rows, err := a.db.NamedQuery(query, click)
+	rows, err := a.db.NamedQueryContext(ctx, query, click)
 	if err != nil {
 		return err
 	}
@@ -91,7 +92,7 @@ func (a *analysisRepo) Create(click url.Click) error {
 	return nil
 }
 
-func (a *analysisRepo) GetBrowserCount(Id uuid.UUID) (map[string]int64, error) {
+func (a *analysisRepo) GetBrowserCount(ctx context.Context, Id uuid.UUID) (map[string]int64, error) {
 	result := map[string]int64{}
 	query := `
 		select
@@ -101,7 +102,7 @@ func (a *analysisRepo) GetBrowserCount(Id uuid.UUID) (map[string]int64, error) {
 		where url_id = $1
 		group by browser
 	`
-	rows, err := a.db.Query(query, Id)
+	rows, err := a.db.QueryContext(ctx, query, Id)
 	if err != nil {
 		return result, err
 	}
@@ -115,7 +116,7 @@ func (a *analysisRepo) GetBrowserCount(Id uuid.UUID) (map[string]int64, error) {
 	return result, nil
 }
 
-func (a *analysisRepo) GetDeviceCount(Id uuid.UUID) (map[string]int64, error) {
+func (a *analysisRepo) GetDeviceCount(ctx context.Context, Id uuid.UUID) (map[string]int64, error) {
 	result := map[string]int64{}
 	query := `
 		select
@@ -125,7 +126,7 @@ func (a *analysisRepo) GetDeviceCount(Id uuid.UUID) (map[string]int64, error) {
 		where url_id = $1
 		group by device
 	`
-	rows, err := a.db.Query(query, Id)
+	rows, err := a.db.QueryContext(ctx, query, Id)
 	if err != nil {
 		return result, err
 	}
@@ -139,7 +140,7 @@ func (a *analysisRepo) GetDeviceCount(Id uuid.UUID) (map[string]int64, error) {
 	return result, nil
 }
 
-func (a *analysisRepo) GetOSCount(Id uuid.UUID) (map[string]int64, error) {
+func (a *analysisRepo) GetOSCount(ctx context.Context, Id uuid.UUID) (map[string]int64, error) {
 	result := map[string]int64{}
 	query := `
 		select
@@ -149,7 +150,7 @@ func (a *analysisRepo) GetOSCount(Id uuid.UUID) (map[string]int64, error) {
 		where url_id = $1
 		group by os
 	`
-	rows, err := a.db.Query(query, Id)
+	rows, err := a.db.QueryContext(ctx, query, Id)
 	if err != nil {
 		return result, err
 	}

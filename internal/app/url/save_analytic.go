@@ -16,7 +16,7 @@ func (s *service) Save(ctx context.Context, msg queue.ClickEvent) error {
 		// should not be empty
 	}
 
-	found, err := s.urlRepo.GetByShortCode(msg.ShortCode)
+	found, err := s.urlRepo.GetByShortCode(ctx, msg.ShortCode)
 	if err != nil {
 		return err
 	}
@@ -31,12 +31,12 @@ func (s *service) Save(ctx context.Context, msg queue.ClickEvent) error {
 		ClickedAt:  msg.ClickedAt,
 	}
 
-	err = s.analysisRepo.Create(click)
+	err = s.analysisRepo.Create(ctx, click)
 	if err != nil {
 		return err
 	}
 
-	err = s.urlRepo.Update(found.Id, msg.ClickedAt)
+	err = s.urlRepo.Update(ctx, found.Id, msg.ClickedAt)
 	if err != nil {
 		return err
 	}

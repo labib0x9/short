@@ -11,9 +11,9 @@ import (
 )
 
 type Service interface {
-	Shorten(longUrl string, expireAt *time.Time, userAgent string) (ShortenResult, error)
+	Shorten(ctx context.Context, longUrl string, expireAt *time.Time, userAgent string) (ShortenResult, error)
 	Get(ctx context.Context, code string) (*url.Url, error)
-	Analysis(code string) (url.Analysis, error)
+	Analysis(ctx context.Context, code string) (url.Analysis, error)
 	Save(ctx context.Context, msg queue.ClickEvent) error
 }
 
