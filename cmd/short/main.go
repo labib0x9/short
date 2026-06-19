@@ -38,7 +38,6 @@ func main() {
 	cacheRepo := redis_cache.NewCache(redisClient)
 	rateLimiter := ratelimitter.NewRateLimiter(redisClient)
 
-	// middlewares := middleware.NewMiddlewares(cacheRepo)
 	txMngr := postgres.NewTxManager(pgConn)
 
 	urlService := urlapp.NewService(urlRepo, analysisRepo, txMngr, cacheRepo, cnf)
