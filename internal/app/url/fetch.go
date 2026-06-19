@@ -11,6 +11,7 @@ import (
 )
 
 func (s *service) Get(ctx context.Context, code, referer, userAgent, remoteAddr string) (*url.Url, error) {
+	now := time.Now()
 	expireKey := "expire:" + code
 	_, err := s.cache.Get(ctx, expireKey)
 	if err == nil {
@@ -22,6 +23,7 @@ func (s *service) Get(ctx context.Context, code, referer, userAgent, remoteAddr 
 	if err == nil {
 		var cached url.Url
 		if err := json.Unmarshal([]byte(value), &cached); err == nil {
+			go s.publish(code, now, referer, userAgent, remoteAddr)
 			return &cached, nil
 		}
 	}
@@ -45,22 +47,22 @@ func (s *service) Get(ctx context.Context, code, referer, userAgent, remoteAddr 
 	urlJson, err := json.Marshal(fetchedUrl)
 	s.cache.Set(ctx, cacheKey, string(urlJson), duration)
 
-	go s.publish(queue.ClickEvent{
-		ShortCode: code,
-		ClickedAt: time.Now(),
-		Referer:   referer,
-		UserAgent: userAgent,
-		IP:        remoteAddr,
-		Retries:   2,
-	})
+	go s.publish(code, now, referer, userAgent, remoteAddr)
 
 	return fetchedUrl, err
 }
 
-func (s *service) publish(event queue.ClickEvent) {
+func (s *service) publish(code string, createdAt time.Time, referer, userAgent, remoteAddr string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := s.queue.PublishAnalytics(ctx, event); err != nil {
-		slog.Error("Publishing failed", "error", err, "short", event.ShortCode)
+	if err := s.queue.PublishAnalytics(ctx, queue.ClickEvent{
+		ShortCode: code,
+		ClickedAt: createdAt,
+		Referer:   referer,
+		UserAgent: userAgent,
+		IP:        remoteAddr,
+		Retries:   2,
+	}); err != nil {
+		slog.Error("Publishing failed", "error", err, "short", code)
 	}
 }
