@@ -55,8 +55,8 @@ func loadConfig() {
 		log.Panic(err)
 	}
 
-	version := os.Getenv("ADDR")
-	if version == "" {
+	addr := os.Getenv("ADDR")
+	if addr == "" {
 		log.Panic("ADDR")
 	}
 
@@ -151,6 +151,7 @@ func loadConfig() {
 	}
 
 	configuration = &Config{
+		Addr:    addr,
 		Port:    port,
 		Service: serviceName,
 		Prefix:  prefix,

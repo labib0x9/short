@@ -62,7 +62,9 @@ func (m *mockService) Save(ctx context.Context, msg queue.ClickEvent) error {
 func (m *mockService) Shorten(ctx context.Context, longUrl string, expireAt *time.Time, userAgent string) (url.ShortenResult, error) {
 	return url.ShortenResult{}, nil
 }
-func (m *mockService) Get(ctx context.Context, code string) (*urldomain.Url, error) { return nil, nil }
+func (m *mockService) Get(ctx context.Context, code, referer, userAgent, remoteAddr string) (*urldomain.Url, error) {
+	return nil, nil
+}
 func (m *mockService) Analysis(ctx context.Context, code string) (urldomain.Analysis, error) {
 	return urldomain.Analysis{}, nil
 }

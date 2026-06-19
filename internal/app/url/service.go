@@ -13,7 +13,7 @@ import (
 
 type Service interface {
 	Shorten(ctx context.Context, longUrl string, expireAt *time.Time, userAgent string) (ShortenResult, error)
-	Get(ctx context.Context, code string) (*url.Url, error)
+	Get(ctx context.Context, code, referer, userAgent, remoteAddr string) (*url.Url, error)
 	Analysis(ctx context.Context, code string) (url.Analysis, error)
 	Save(ctx context.Context, msg queue.ClickEvent) error
 }
@@ -23,6 +23,7 @@ type service struct {
 	analysisRepo url.AnalyticsRepository
 	txMngr       db.TxManager // transaction manager
 	cache        cache.Cache
+	queue        queue.Queue
 	cnf          *config.Config
 }
 
@@ -31,6 +32,7 @@ func NewService(
 	analysisRepo url.AnalyticsRepository,
 	txMngr db.TxManager,
 	cache cache.Cache,
+	queue queue.Queue,
 	cnf *config.Config,
 ) Service {
 	return &service{
@@ -38,6 +40,7 @@ func NewService(
 		analysisRepo: analysisRepo,
 		txMngr:       txMngr,
 		cache:        cache,
+		queue:        queue,
 		cnf:          cnf,
 	}
 }

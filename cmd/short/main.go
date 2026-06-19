@@ -38,10 +38,9 @@ func main() {
 	cacheRepo := redis_cache.NewCache(redisClient)
 	rateLimiter := ratelimitter.NewRateLimiter(redisClient)
 
-	// middlewares := middleware.NewMiddlewares(cacheRepo)
 	txMngr := postgres.NewTxManager(pgConn)
 
-	urlService := urlapp.NewService(urlRepo, analysisRepo, txMngr, cacheRepo, cnf)
+	urlService := urlapp.NewService(urlRepo, analysisRepo, txMngr, cacheRepo, rabbitMq, cnf)
 
 	worker := worker.NewWorker(rabbitMq, urlService)
 
@@ -52,7 +51,7 @@ func main() {
 
 	validate := validator.New()
 	staticHandler := static.NewHandler()
-	urlHandler := url.NewHandler(urlService, rabbitMq, validate)
+	urlHandler := url.NewHandler(urlService, validate)
 
 	server := rest.NewServer(urlHandler, staticHandler)
 
