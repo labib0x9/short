@@ -153,15 +153,15 @@ PORT=3000
 PREFIX=http://localhost:3000/
 SERVICE_NAME=short-api
 
-DB_USER=shortuser
-DB_PASSWORD=secret
-DB_PORT=5432
-DB_ADDRESS=localhost
-DB_NAME=urlshortener
-DB_SSLMODE=disable
+PG_USER=shortuser
+PG_PASSWORD=secret
+PG_PORT=5432
+PG_ADDRESS=localhost
+PG_NAME=urlshortener
+PG_SSLMODE=disable
 
-DB_SUPERUSER=postgres
-DB_SUPERDB=postgres
+PG_SUPERUSER=postgres
+PG_SUPERDB=postgres
 
 REDIS_ADDR=localhost:6379
 
