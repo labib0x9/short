@@ -20,6 +20,7 @@ func NewCleaner(srv url.Service) Cleaner {
 
 func (c *Cleaner) Run(ctx context.Context) error {
 	timer := time.NewTicker(5 * time.Minute)
+	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
