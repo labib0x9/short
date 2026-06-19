@@ -16,10 +16,10 @@ func (s *service) Save(ctx context.Context, msg queue.ClickEvent) error {
 		// should not be empty
 	}
 
-	return s.txMngr.With(ctx, func(ctx context.Context) error {
+	_, err := s.txMngr.With(ctx, func(ctx context.Context) (any, error) {
 		found, err := s.urlRepo.GetByShortCode(ctx, msg.ShortCode)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		click := url.Click{
@@ -34,11 +34,12 @@ func (s *service) Save(ctx context.Context, msg queue.ClickEvent) error {
 
 		err = s.analysisRepo.Create(ctx, click)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		return s.urlRepo.Update(ctx, found.Id, msg.ClickedAt)
+		return nil, s.urlRepo.Update(ctx, found.Id, msg.ClickedAt)
 	})
+	return err
 }
 
 func parseUserAgent(agent string) (device string, browser string, os string) {

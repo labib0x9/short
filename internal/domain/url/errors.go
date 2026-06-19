@@ -14,5 +14,6 @@ var (
 	ErrDatabaseUpdate     = errors.New("database update error")
 	ErrDatabaseDelete     = errors.New("database delete error")
 
-	ErrUrlShortLenght = errors.New("")
+	ErrUrlShortLenght     = errors.New("")
+	ErrGetAnalyticsFailed = errors.New("Analytics failed")
 )
