@@ -42,7 +42,7 @@ func (s *service) Shorten(ctx context.Context, longUrl string, expireAt *time.Ti
 		ExpireAt:  expireAt,
 	}
 
-	if !value.IsTimeValid() {
+	if !value.After() {
 		return ShortenResult{}, url.ErrShortCodeExpired
 	}
 

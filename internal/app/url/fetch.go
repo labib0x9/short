@@ -30,7 +30,7 @@ func (s *service) Get(ctx context.Context, code string) (*url.Url, error) {
 		return nil, err
 	}
 
-	if !fetchedUrl.IsTimeValid() {
+	if fetchedUrl.IsExpired() {
 		s.cache.Set(ctx, expireKey, "1", 0)
 		return nil, url.ErrShortCodeExpired
 	}

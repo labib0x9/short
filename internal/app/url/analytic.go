@@ -13,7 +13,7 @@ func (s *service) Analysis(ctx context.Context, code string) (url.Analysis, erro
 			return nil, err
 		}
 
-		if !foundUrl.IsTimeValid() {
+		if foundUrl.IsExpired() {
 			return nil, url.ErrShortCodeExpired
 		}
 
