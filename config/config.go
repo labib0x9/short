@@ -111,12 +111,12 @@ func loadConfig() {
 	}
 
 	dbSuperUser := os.Getenv("PG_SUPERUSER")
-	if dbSSlmode == "" {
+	if dbSuperUser == "" {
 		log.Panic("PG_SUPERUSER")
 	}
 
 	dbSuperDb := os.Getenv("PG_SUPERDB")
-	if dbSSlmode == "" {
+	if dbSuperDb == "" {
 		log.Panic("PG_SUPERDB")
 	}
 
@@ -147,7 +147,7 @@ func loadConfig() {
 
 	rmqPass := os.Getenv("RMQ_PASS")
 	if rmqPass == "" {
-		log.Panic("REDIS_PASS")
+		log.Panic("RMQ_PASS")
 	}
 
 	configuration = &Config{
