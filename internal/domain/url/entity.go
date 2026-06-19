@@ -16,6 +16,22 @@ type Url struct {
 	ExpireAt      *time.Time `json:"expire_at"    db:"expire_at"`
 }
 
+func (u *Url) IsExpired() bool {
+	if u.ExpireAt == nil {
+		return false
+	}
+	return (*u.ExpireAt).Before(time.Now())
+}
+
+// to check if expireAt is before now()
+// true = yes
+func (u *Url) After() bool {
+	if u.ExpireAt == nil {
+		return true
+	}
+	return (*u.ExpireAt).After(time.Now())
+}
+
 type Click struct {
 	Id         int64     `json:"id" db:"id"`
 	UrlId      uuid.UUID `json:"url_id" db:"url_id"`
@@ -25,6 +41,24 @@ type Click struct {
 	Os         string    `json:"os"    db:"os"`
 	Browser    string    `json:"browser"    db:"browser"`
 	ClickedAt  time.Time `json:"clicked_at"    db:"clicked_at"`
+}
+
+func (c *Click) SetEmptyFields() {
+	if c.Country == "" {
+		c.Country = "unknown"
+	}
+
+	if c.DeviceType == "" {
+		c.DeviceType = "unknown"
+	}
+
+	if c.Os == "" {
+		c.Os = "unknown"
+	}
+
+	if c.Browser == "" {
+		c.Browser = "unknown"
+	}
 }
 
 type Analysis struct {

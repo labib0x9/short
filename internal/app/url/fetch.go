@@ -16,11 +16,10 @@ func (s *service) Get(ctx context.Context, code string) (*url.Url, error) {
 	}
 
 	cacheKey := "short:" + code
-	value, err := s.cache.Get(ctx, code)
+	value, err := s.cache.Get(ctx, cacheKey)
 	if err == nil {
 		var cached url.Url
 		if err := json.Unmarshal([]byte(value), &cached); err == nil {
-
 			return &cached, nil
 		}
 	}
@@ -30,16 +29,15 @@ func (s *service) Get(ctx context.Context, code string) (*url.Url, error) {
 		return nil, err
 	}
 
+	if fetchedUrl.IsExpired() {
+		s.cache.Set(ctx, expireKey, "1", 0)
+		return nil, url.ErrShortCodeExpired
+	}
+
 	duration := 5 * time.Minute
 	if fetchedUrl.ExpireAt != nil {
-		if fetchedUrl.CreatedAt != *fetchedUrl.ExpireAt && fetchedUrl.ExpireAt.Before(time.Now()) {
-			s.cache.Set(ctx, expireKey, "1", 0)
-			return nil, url.ErrShortCodeCollision
-		}
-		if err == nil {
-			expire := fetchedUrl.ExpireAt.Sub(fetchedUrl.CreatedAt)
-			duration = min(expire, duration)
-		}
+		expire := fetchedUrl.ExpireAt.Sub(fetchedUrl.CreatedAt)
+		duration = min(expire, duration)
 	}
 
 	urlJson, err := json.Marshal(fetchedUrl)

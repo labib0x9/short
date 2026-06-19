@@ -13,6 +13,10 @@ func (s *service) Analysis(ctx context.Context, code string) (url.Analysis, erro
 			return nil, err
 		}
 
+		if foundUrl.IsExpired() {
+			return nil, url.ErrShortCodeExpired
+		}
+
 		browser, err := s.analysisRepo.GetBrowserCount(ctx, foundUrl.Id)
 		if err != nil {
 			return nil, err
