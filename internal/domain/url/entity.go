@@ -16,12 +16,20 @@ type Url struct {
 	ExpireAt      *time.Time `json:"expire_at"    db:"expire_at"`
 }
 
-func (u *Url) IsTimeValid() bool {
+func (u *Url) IsExpired() bool {
+	if u.ExpireAt == nil {
+		return false
+	}
+	return (*u.ExpireAt).Before(time.Now())
+}
+
+// to check if expireAt is before now()
+// true = yes
+func (u *Url) After() bool {
 	if u.ExpireAt == nil {
 		return true
 	}
-
-	return time.Now().After(*u.ExpireAt)
+	return (*u.ExpireAt).After(time.Now())
 }
 
 type Click struct {
