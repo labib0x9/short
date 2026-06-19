@@ -69,6 +69,10 @@ func (m *mockService) Analysis(ctx context.Context, code string) (urldomain.Anal
 	return urldomain.Analysis{}, nil
 }
 
+func (m *mockService) DeleteByExpireAt(ctx context.Context) error {
+	return nil
+}
+
 // --- Helpers ---
 func makeDelivery(t *testing.T, event queue.ClickEvent) *mockDelivery {
 	t.Helper()

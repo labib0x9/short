@@ -16,6 +16,7 @@ type Service interface {
 	Get(ctx context.Context, code, referer, userAgent, remoteAddr string) (*url.Url, error)
 	Analysis(ctx context.Context, code string) (url.Analysis, error)
 	Save(ctx context.Context, msg queue.ClickEvent) error
+	DeleteByExpireAt(ctx context.Context) error
 }
 
 type service struct {
