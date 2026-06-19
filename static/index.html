@@ -502,6 +502,41 @@
     el.classList.remove('visible');
   }
 
+  // The API wraps most errors as JSON: {"error": "...", "code": ...}
+  // but the rate-limiter middleware (429, and its own 500) writes plain
+  // text via http.Error, so JSON parsing isn't safe to assume.
+  async function readErrorMessage(res) {
+    const raw = await res.text();
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.error === 'string') return parsed.error;
+    } catch (_) {
+      // not JSON — fall through to raw text
+    }
+    return raw.trim() || `server returned ${res.status}`;
+  }
+
+  // Maps a failed response to a user-facing message, covering every
+  // status code the API can currently return across all routes.
+  async function describeError(res) {
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('Retry-After');
+      return retryAfter
+        ? `too many requests — try again in ${retryAfter}s`
+        : 'too many requests — slow down a bit';
+    }
+
+    const msg = await readErrorMessage(res);
+
+    switch (res.status) {
+      case 400: return 'bad request — ' + msg;
+      case 404: return 'not found — ' + msg;
+      case 410: return 'this short url has expired';
+      case 500: return 'server error — please try again';
+      default:  return msg;
+    }
+  }
+
   function fmtDate(iso) {
     if (!iso) return 'never';
     return new Date(iso).toLocaleString(undefined, {
@@ -590,12 +625,12 @@
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        showError(errEl, `server returned ${res.status}`);
+        showError(errEl, await describeError(res));
         return;
       }
+
+      const data = await res.json();
 
       lastCode = data.code;
 
@@ -657,12 +692,8 @@
     try {
       const res = await fetch(`${BASE}/${code}/stat`);
 
-      if (res.status === 404) {
-        showError(errEl, `code "${code}" not found`);
-        return;
-      }
       if (!res.ok) {
-        showError(errEl, `server returned ${res.status}`);
+        showError(errEl, await describeError(res));
         return;
       }
 
