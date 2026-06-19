@@ -1,0 +1,2 @@
+GET http://localhost:3000/aB3kZ9
+GET http://localhost:3000/aB3kZ9/stat
