@@ -20,20 +20,21 @@ func NewTxManager(db *sqlx.DB) db.TxManager {
 	}
 }
 
-func (t *txManager) With(ctx context.Context, fn func(ctx context.Context) error) error {
+func (t *txManager) With(ctx context.Context, fn func(ctx context.Context) (any, error)) (any, error) {
 	tx, err := t.db.BeginTxx(ctx, &sql.TxOptions{
 		Isolation: sql.LevelRepeatableRead,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	txCtx := context.WithValue(ctx, txKey{}, tx)
-	if err := fn(txCtx); err != nil {
+	result, err := fn(txCtx)
+	if err != nil {
 		tx.Rollback()
-		return err
+		return nil, err
 	}
-	return tx.Commit()
+	return result, tx.Commit()
 }
 
 // Get db connection from context, if absent fallback to db
