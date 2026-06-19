@@ -1,6 +1,7 @@
 package url
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -16,7 +17,7 @@ type ShortenResult struct {
 	ExpireAt *time.Time `json:"expire_at"`
 }
 
-func (s *service) Shorten(longUrl string, expireAt *time.Time, userAgent string) (ShortenResult, error) {
+func (s *service) Shorten(ctx context.Context, longUrl string, expireAt *time.Time, userAgent string) (ShortenResult, error) {
 	if len(longUrl) <= 25 {
 		return ShortenResult{}, url.ErrUrlShortLenght
 	}
@@ -26,7 +27,7 @@ func (s *service) Shorten(longUrl string, expireAt *time.Time, userAgent string)
 
 	createdAt := time.Now()
 
-	existShort, err := s.urlRepo.GetByShortCode(short)
+	existShort, err := s.urlRepo.GetByShortCode(ctx, short)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return ShortenResult{}, err
 	}
@@ -42,7 +43,7 @@ func (s *service) Shorten(longUrl string, expireAt *time.Time, userAgent string)
 		ExpireAt:  expireAt,
 	}
 
-	err = s.urlRepo.Create(value)
+	err = s.urlRepo.Create(ctx, value)
 	if err != nil {
 		return ShortenResult{}, err
 	}

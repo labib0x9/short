@@ -25,7 +25,7 @@ func (s *service) Get(ctx context.Context, code string) (*url.Url, error) {
 		}
 	}
 
-	fetchedUrl, err := s.urlRepo.GetByShortCode(code)
+	fetchedUrl, err := s.urlRepo.GetByShortCode(ctx, code)
 	if err != nil || fetchedUrl == nil {
 		return nil, err
 	}

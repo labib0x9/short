@@ -29,7 +29,7 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.srv.Shorten(req.Url, req.ExpireAt, r.Header.Get("User-Agent"))
+	result, err := h.srv.Shorten(r.Context(), req.Url, req.ExpireAt, r.Header.Get("User-Agent"))
 	if err != nil {
 		http.Error(w, "internl server error", http.StatusInternalServerError)
 		slog.Warn("Shorten: srv.Shorten()", "error", err)

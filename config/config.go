@@ -80,44 +80,44 @@ func loadConfig() {
 		log.Panic("SERVICE_NAME")
 	}
 
-	dbUser := os.Getenv("DB_USER")
+	dbUser := os.Getenv("PG_USER")
 	if dbUser == "" {
-		log.Panic("DB_USER")
+		log.Panic("PG_USER")
 	}
 
-	dbPass := os.Getenv("DB_PASSWORD")
+	dbPass := os.Getenv("PG_PASSWORD")
 	if dbPass == "" {
-		log.Panic("DB_PASSWORD")
+		log.Panic("PG_PASSWORD")
 	}
 
-	dbPort := os.Getenv("DB_PORT")
+	dbPort := os.Getenv("PG_PORT")
 	if dbPort == "" {
-		log.Panic("DB_PORT")
+		log.Panic("PG_PORT")
 	}
 
-	dbAddr := os.Getenv("DB_ADDRESS")
+	dbAddr := os.Getenv("PG_ADDRESS")
 	if dbAddr == "" {
-		log.Panic("DB_ADDRESS")
+		log.Panic("PG_ADDRESS")
 	}
 
-	dbName := os.Getenv("DB_NAME")
+	dbName := os.Getenv("PG_NAME")
 	if dbName == "" {
-		log.Panic("DB_NAME")
+		log.Panic("PG_NAME")
 	}
 
-	dbSSlmode := os.Getenv("DB_SSLMODE")
+	dbSSlmode := os.Getenv("PG_SSLMODE")
 	if dbSSlmode == "" {
-		log.Panic("DB_SSLMODE")
+		log.Panic("PG_SSLMODE")
 	}
 
-	dbSuperUser := os.Getenv("DB_SUPERUSER")
+	dbSuperUser := os.Getenv("PG_SUPERUSER")
 	if dbSSlmode == "" {
-		log.Panic("DB_SUPERUSER")
+		log.Panic("PG_SUPERUSER")
 	}
 
-	dbSuperDb := os.Getenv("DB_SUPERDB")
+	dbSuperDb := os.Getenv("PG_SUPERDB")
 	if dbSSlmode == "" {
-		log.Panic("DB_SUPERDB")
+		log.Panic("PG_SUPERDB")
 	}
 
 	redisAddr := os.Getenv("REDIS_ADDR")

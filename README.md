@@ -5,7 +5,9 @@ A URL shortener service written in Go, built with a Domain-Driven Design (DDD) a
 ## Project Structure
 
 ```
-cmd/short/              → entrypoint & wiring
+cmd/                    → entrypoint & wiring
+  short/                → server's main.go              
+  migration/            → migration's main.go
 config/                 → environment config
 internal/
   domain/               → entities, repository interfaces, domain errors
@@ -151,15 +153,15 @@ PORT=3000
 PREFIX=http://localhost:3000/
 SERVICE_NAME=short-api
 
-DB_USER=shortuser
-DB_PASSWORD=secret
-DB_PORT=5432
-DB_ADDRESS=localhost
-DB_NAME=urlshortener
-DB_SSLMODE=disable
+PG_USER=shortuser
+PG_PASSWORD=secret
+PG_PORT=5432
+PG_ADDRESS=localhost
+PG_NAME=urlshortener
+PG_SSLMODE=disable
 
-DB_SUPERUSER=postgres
-DB_SUPERDB=postgres
+PG_SUPERUSER=postgres
+PG_SUPERDB=postgres
 
 REDIS_ADDR=localhost:6379
 
@@ -168,23 +170,36 @@ RMQ_USER=guest
 RMQ_PASS=guest
 ```
 
-### Run
+### Run Migration
+See migration section
+
+### Run Server
 
 ```bash
-go run ./cmd/short
+go run ./cmd/short/main.go
 ```
 
 The application will:
-1. Connect to PostgreSQL as the superuser and create the app role/database if they don't exist
-2. Run any pending migrations automatically
-3. Connect to Redis and RabbitMQ
-4. Declare the `analytics.queue` and `analytics.queue.dead` queues
-5. Start the analytics worker goroutine
-6. Start the HTTP server
+1. Connect to PostgreSQL, Redis and RabbitMQ
+2. Declare the `analytics.queue` and `analytics.queue.dead` queues
+3. Start the analytics worker goroutine
+4. Start the HTTP server
+
 
 ## Migration
 
-- Migrations are managed with `golang-migrate` and run automatically on startup.
+- Migrations are managed with `golang-migrate` and need to run manually via migrate cli.
+
+```bash
+# connects to super user and create user, database
+go run ./cmd/migration/main.go -setup
+
+# run the migration
+go run ./cmd/migration/main.go -up
+
+# rollback migration level-1
+go run ./cmd/migration/main.go -down
+```
 
 ## Middleware
 
@@ -196,7 +211,6 @@ Global middleware is applied in FCFS order via the `middleware.Manager`:
 ## Future-Work
 - Proper error handling
 - Upgrade token bucket rate limiting to sliding window
-- Seperate migration from startup
 - Dockerize the entire app
 - Follow ACID Principle on database query
 - Query optimization
