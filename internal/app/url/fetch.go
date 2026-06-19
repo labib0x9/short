@@ -16,11 +16,10 @@ func (s *service) Get(ctx context.Context, code string) (*url.Url, error) {
 	}
 
 	cacheKey := "short:" + code
-	value, err := s.cache.Get(ctx, code)
+	value, err := s.cache.Get(ctx, cacheKey)
 	if err == nil {
 		var cached url.Url
 		if err := json.Unmarshal([]byte(value), &cached); err == nil {
-
 			return &cached, nil
 		}
 	}
