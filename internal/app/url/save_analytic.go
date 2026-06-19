@@ -12,9 +12,6 @@ import (
 // Get country from ip
 func (s *service) Save(ctx context.Context, msg queue.ClickEvent) error {
 	device, browser, os := parseUserAgent(msg.UserAgent)
-	if device == "" || browser == "" || os == "" {
-		// should not be empty
-	}
 
 	_, err := s.txMngr.With(ctx, func(ctx context.Context) (any, error) {
 		found, err := s.urlRepo.GetByShortCode(ctx, msg.ShortCode)
@@ -35,6 +32,8 @@ func (s *service) Save(ctx context.Context, msg queue.ClickEvent) error {
 			Browser:    browser,
 			ClickedAt:  msg.ClickedAt,
 		}
+
+		click.SetEmptyFields()
 
 		err = s.analysisRepo.Create(ctx, click)
 		if err != nil {
@@ -59,17 +58,5 @@ func parseUserAgent(agent string) (device string, browser string, os string) {
 	os = ua.OS
 
 	browser = ua.Name
-
-	switch {
-	case device == "":
-		device = "unknown"
-		fallthrough
-	case browser == "":
-		browser = "unknown"
-		fallthrough
-	case os == "":
-		os = "unknown"
-	}
-
 	return
 }

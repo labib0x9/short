@@ -43,6 +43,24 @@ type Click struct {
 	ClickedAt  time.Time `json:"clicked_at"    db:"clicked_at"`
 }
 
+func (c *Click) SetEmptyFields() {
+	if c.Country == "" {
+		c.Country = "unknown"
+	}
+
+	if c.DeviceType == "" {
+		c.DeviceType = "unknown"
+	}
+
+	if c.Os == "" {
+		c.Os = "unknown"
+	}
+
+	if c.Browser == "" {
+		c.Browser = "unknown"
+	}
+}
+
 type Analysis struct {
 	ShortURL   string           `json:"short"`
 	ClickCount int64            `json:"total_count"`
