@@ -3,9 +3,6 @@ package url
 import (
 	"log/slog"
 	"net/http"
-	"time"
-
-	"github.com/labib0x9/short/internal/domain/queue"
 )
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -15,7 +12,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url, err := h.srv.Get(r.Context(), code)
+	url, err := h.srv.Get(r.Context(), code, r.Referer(), r.UserAgent(), r.RemoteAddr)
 	if err != nil {
 		http.Error(w, "internl server error", http.StatusInternalServerError)
 		slog.Warn("Get: srv.Get()", "error", err)
@@ -23,15 +20,4 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, url.URL, http.StatusFound)
-
-	if err := h.queue.PublishAnalytics(r.Context(), queue.ClickEvent{
-		ShortCode: code,
-		ClickedAt: time.Now(),
-		Referer:   r.Referer(),
-		UserAgent: r.UserAgent(),
-		IP:        r.RemoteAddr,
-		Retries:   2,
-	}); err != nil {
-		// what to do??
-	}
 }
