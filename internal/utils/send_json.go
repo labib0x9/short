@@ -1,21 +1,36 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
 func SendJson(w http.ResponseWriter, v any, statusCode int) {
-
-	fmt.Println("I AM HERE")
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	if err := encoder.Encode(v); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+	buf.WriteTo(w)
+}
 
-	encoder := json.NewEncoder(w)
-	if err := encoder.Encode(v); err != nil {
-		http.Error(w, "Internal Server Error-Encode.", http.StatusInternalServerError)
+func SendError(w http.ResponseWriter, v string, statusCode int) {
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	if err := encoder.Encode(map[string]any{
+		"error": v,
+		"code":  statusCode,
+	}); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	buf.WriteTo(w)
 }
