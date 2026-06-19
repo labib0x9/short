@@ -26,7 +26,8 @@ internal/
     http/               → server, middleware manager, route handlers
   worker/               → async analytics consumer (RabbitMQ)
   utils/                → code generation, JSON helpers
-migrations/             → SQL migration files (golang-migrate)
+  cron/                 → Cron cleaner 
+migrations/             → SQL migration files
 static/                 → Frontend code (claude generated)
 ```
 
@@ -53,6 +54,7 @@ static/                 → Frontend code (claude generated)
 - **Rate limiting** — token bucket implemented as an atomic Lua script in Redis
 - **Dead-letter queue** — failed analytics messages are routed to `analytics.queue.dead` after exhausting retries
 - **Graceful shutdown** — SIGINT/SIGTERM handling with configurable drain timeout
+- **Cleaner** - Cron job to delete expired urls
 
 ## API
 
@@ -209,7 +211,6 @@ Global middleware is applied in FCFS order via the `middleware.Manager`:
 - **RateLimiter** — token bucket at 5 req/s per IP, capacity 10, enforced atomically via a Redis Lua script. Responds with `429` and `Retry-After` header on breach.
 
 ## Future-Work
-- Proper error handling
 - Upgrade token bucket rate limiting to sliding window
 - Dockerize the entire app
 - Follow ACID Principle on database query

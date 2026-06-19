@@ -12,6 +12,7 @@ type UrlRepository interface {
 	GetByShortCode(ctx context.Context, shortCode string) (*Url, error)
 	Update(ctx context.Context, id uuid.UUID, lastClickedAt time.Time) error
 	GetMetadata(ctx context.Context, code string) (*Url, error)
+	DeleteByExpireAt(ctx context.Context) error
 }
 
 type AnalyticsRepository interface {

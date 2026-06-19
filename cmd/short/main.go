@@ -9,6 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labib0x9/short/config"
 	urlapp "github.com/labib0x9/short/internal/app/url"
+	"github.com/labib0x9/short/internal/cron"
 	"github.com/labib0x9/short/internal/infra/postgres"
 	"github.com/labib0x9/short/internal/infra/rabbitmq"
 	"github.com/labib0x9/short/internal/infra/redis"
@@ -43,11 +44,13 @@ func main() {
 	urlService := urlapp.NewService(urlRepo, analysisRepo, txMngr, cacheRepo, rabbitMq, cnf)
 
 	worker := worker.NewWorker(rabbitMq, urlService)
+	cleaner := cron.NewCleaner(urlService)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	go worker.Run(ctx, "analytics-worker", 10)
+	go cleaner.Run(ctx)
 
 	validate := validator.New()
 	staticHandler := static.NewHandler()

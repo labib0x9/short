@@ -18,12 +18,7 @@ type ShortenResult struct {
 }
 
 func (s *service) Shorten(ctx context.Context, longUrl string, expireAt *time.Time, userAgent string) (ShortenResult, error) {
-	if len(longUrl) <= 25 {
-		return ShortenResult{}, url.ErrUrlShortLenght
-	}
-
 	short := utils.GetShortUrl(longUrl)
-
 	createdAt := time.Now()
 
 	existShort, err := s.urlRepo.GetByShortCode(ctx, short)

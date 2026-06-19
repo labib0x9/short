@@ -74,6 +74,15 @@ func (u *urlRepo) GetMetadata(ctx context.Context, code string) (*url.Url, error
 	return &found, nil
 }
 
+func (u *urlRepo) DeleteByExpireAt(ctx context.Context) error {
+	db := getDBFromCtx(ctx, u.db)
+	query := `
+		delete from urls where expire_at is not NULL and expire_at < NOW()
+	`
+	_, err := db.ExecContext(ctx, query)
+	return err
+}
+
 type analysisRepo struct {
 	db *sqlx.DB
 }
