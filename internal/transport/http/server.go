@@ -2,8 +2,9 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/labib0x9/short/config"
@@ -16,6 +17,7 @@ import (
 type Server struct {
 	urlHandler    *url.Handler
 	staticHandler *static.Handler
+	server        http.Server
 }
 
 func NewServer(urlHandler *url.Handler, staticHandler *static.Handler) Server {
@@ -41,10 +43,19 @@ func (s *Server) Start(limiter cache.RateLimiter, cnf *config.Config) {
 	s.urlHandler.RegisterRoutes(mux, manager)
 	s.staticHandler.RegisterRoutes(mux, manager)
 
-	fmt.Printf("Starting Server at http://127.0.0.1:%d/\n", cnf.Port)
-	log.Fatal(http.ListenAndServe(":3000", wrappedMux))
+	addr := fmt.Sprintf("http://%s:%d", cnf.Addr, cnf.Port)
+	s.server = http.Server{
+		Addr:    fmt.Sprintf(":%d", cnf.Port),
+		Handler: wrappedMux,
+	}
+
+	fmt.Printf("Starting Server at %s\n", addr)
+	err := s.server.ListenAndServe()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		slog.Error("Server ListenAndServe():", "error", err)
+	}
 }
 
 func (s *Server) Shutdown(ctx context.Context) {
-
+	s.server.Shutdown(ctx)
 }
