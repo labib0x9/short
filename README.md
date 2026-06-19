@@ -46,7 +46,7 @@ static/                 → Frontend code (claude generated)
 
 ## Features
 
-- **URL shortening** — SHA-1 + Base62 encoding with UUID salt to avoid collisions
+- **URL shortening** — FNV-64 URL hash XOR'd into a UUID, base64url-encoded and truncated to 8 characters 
 - **Redirect** — `GET /:code` with Redis cache layer; expired URLs served from cache to avoid DB hits
 - **Click analytics** — async pipeline via RabbitMQ; captures browser, OS, device type, referrer, and timestamp per click
 - **Analytics endpoint** — `GET /:code/stat` returns aggregated browser/OS/device breakdown and total click count
