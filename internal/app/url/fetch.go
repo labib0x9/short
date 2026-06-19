@@ -2,7 +2,9 @@ package url
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -29,7 +31,10 @@ func (s *service) Get(ctx context.Context, code, referer, userAgent, remoteAddr 
 	}
 
 	fetchedUrl, err := s.urlRepo.GetByShortCode(ctx, code)
-	if err != nil || fetchedUrl == nil {
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, url.ErrUrlNotFound
+		}
 		return nil, err
 	}
 

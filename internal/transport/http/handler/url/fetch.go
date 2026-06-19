@@ -22,6 +22,8 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, urldomain.ErrShortCodeExpired):
 			utils.SendError(w, "url expired", http.StatusGone)
+		case errors.Is(err, urldomain.ErrUrlNotFound):
+			utils.SendError(w, "not found", http.StatusNotFound)
 		default:
 			utils.SendError(w, "internl server error", http.StatusInternalServerError)
 		}
