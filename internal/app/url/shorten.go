@@ -22,8 +22,7 @@ func (s *service) Shorten(ctx context.Context, longUrl string, expireAt *time.Ti
 		return ShortenResult{}, url.ErrUrlShortLenght
 	}
 
-	uniqueId := utils.UniqueId(userAgent)
-	short := utils.GetShortUrl(longUrl + uniqueId)
+	short := utils.GetShortUrl(longUrl)
 
 	createdAt := time.Now()
 
