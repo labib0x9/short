@@ -30,16 +30,15 @@ func (s *service) Get(ctx context.Context, code string) (*url.Url, error) {
 		return nil, err
 	}
 
+	if !fetchedUrl.IsTimeValid() {
+		s.cache.Set(ctx, expireKey, "1", 0)
+		return nil, url.ErrShortCodeExpired
+	}
+
 	duration := 5 * time.Minute
 	if fetchedUrl.ExpireAt != nil {
-		if fetchedUrl.CreatedAt != *fetchedUrl.ExpireAt && fetchedUrl.ExpireAt.Before(time.Now()) {
-			s.cache.Set(ctx, expireKey, "1", 0)
-			return nil, url.ErrShortCodeCollision
-		}
-		if err == nil {
-			expire := fetchedUrl.ExpireAt.Sub(fetchedUrl.CreatedAt)
-			duration = min(expire, duration)
-		}
+		expire := fetchedUrl.ExpireAt.Sub(fetchedUrl.CreatedAt)
+		duration = min(expire, duration)
 	}
 
 	urlJson, err := json.Marshal(fetchedUrl)

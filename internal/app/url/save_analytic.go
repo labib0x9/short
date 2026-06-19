@@ -22,6 +22,10 @@ func (s *service) Save(ctx context.Context, msg queue.ClickEvent) error {
 			return nil, err
 		}
 
+		if !found.IsTimeValid() {
+			return nil, url.ErrShortCodeExpired
+		}
+
 		click := url.Click{
 			UrlId:      found.Id,
 			Referer:    msg.Referer,

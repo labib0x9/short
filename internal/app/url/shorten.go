@@ -42,6 +42,10 @@ func (s *service) Shorten(ctx context.Context, longUrl string, expireAt *time.Ti
 		ExpireAt:  expireAt,
 	}
 
+	if !value.IsTimeValid() {
+		return ShortenResult{}, url.ErrShortCodeExpired
+	}
+
 	err = s.urlRepo.Create(ctx, value)
 	if err != nil {
 		return ShortenResult{}, err

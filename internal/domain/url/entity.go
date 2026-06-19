@@ -16,6 +16,14 @@ type Url struct {
 	ExpireAt      *time.Time `json:"expire_at"    db:"expire_at"`
 }
 
+func (u *Url) IsTimeValid() bool {
+	if u.ExpireAt == nil {
+		return true
+	}
+
+	return time.Now().After(*u.ExpireAt)
+}
+
 type Click struct {
 	Id         int64     `json:"id" db:"id"`
 	UrlId      uuid.UUID `json:"url_id" db:"url_id"`
