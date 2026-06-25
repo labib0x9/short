@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/labib0x9/short/internal/domain/cache"
+	"github.com/labib0x9/short/internal/utils"
 )
 
 type RateLimiter struct {
@@ -38,16 +39,16 @@ func NewRateLimiter(
 func (rl *RateLimiter) Limit() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip, err := getIP(r.RemoteAddr)
+			ip, err := getIP(r)
 			if err != nil {
 				http.Error(w, "internal server error", http.StatusInternalServerError)
 				return
 			}
 
-			key := "rate_limit:ip:" + ip
+			key := "rate_limit:ip:" + ip + ":path:" + r.URL.Path
 			res, err := rl.setLimit(r.Context(), key)
 			if err != nil {
-				http.Error(w, "internal server error", http.StatusInternalServerError)
+				utils.SendError(w, "internal server error", http.StatusInternalServerError)
 				return
 			}
 
@@ -58,7 +59,7 @@ func (rl *RateLimiter) Limit() Middleware {
 			if !res.allowed {
 				retryAfterSecs := res.wait_ms / 1000
 				w.Header().Set("Retry-After", strconv.FormatInt(retryAfterSecs, 10))
-				http.Error(w, "too many request", http.StatusTooManyRequests)
+				utils.SendError(w, "too many request", http.StatusTooManyRequests)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -87,7 +88,8 @@ func (rl *RateLimiter) setLimit(ctx context.Context, key string) (rateLimitResul
 	}, nil
 }
 
-func getIP(addr string) (string, error) {
+func getIP(r *http.Request) (string, error) {
+	addr := r.RemoteAddr
 	host, _, err := net.SplitHostPort(addr)
 	return host, err
 }
