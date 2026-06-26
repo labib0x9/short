@@ -29,6 +29,7 @@ internal/
   cron/                 → Cron cleaner 
 migrations/             → SQL migration files
 static/                 → Frontend code (claude generated)
+test/                   → Test files (k6 load test)
 ```
 
 ## Tech Stack
@@ -140,7 +141,7 @@ The worker runs with configurable concurrency (default 10) using a semaphore pat
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.26+
 - PostgreSQL
 - Redis
 - RabbitMQ
@@ -203,50 +204,29 @@ go run ./cmd/migration/main.go -up
 go run ./cmd/migration/main.go -down
 ```
 
-## Test
+## Performance / Load Testing
 
-```bash
-labib0x9@~ $ /Users/labib0x9/go/bin/vegeta attack -duration=60s -rate=20 -targets=load_test.txt | /Users/labib0x9/go/bin/vegeta report
-Requests      [total, rate, throughput]  1200, 20.02, 20.02
-Duration      [total, attack, wait]      59.951732625s, 59.950014542s, 1.718083ms
-Latencies     [mean, 50, 95, 99, max]    3.603037ms, 3.039284ms, 6.945303ms, 9.326793ms, 41.667292ms
-Bytes In      [total, mean]              8494512, 7078.76
-Bytes Out     [total, mean]              21600, 18.00
-Success       [ratio]                    100.00%
-Status Codes  [code:count]               200:800  201:400  
-Error Set:
+Load tested with [k6](https://k6.io) at constant arrival rates with 50-500 max VUs, 60s sustained load per run.
 
-labib0x9@~ $ /Users/labib0x9/go/bin/vegeta attack -duration=60s -rate=100 -targets=load_test.txt | /Users/labib0x9/go/bin/vegeta report
-Requests      [total, rate, throughput]  6000, 100.02, 100.01
-Duration      [total, attack, wait]      59.991671208s, 59.989207542s, 2.463666ms
-Latencies     [mean, 50, 95, 99, max]    3.85778ms, 2.183636ms, 10.617572ms, 12.329536ms, 53.230166ms
-Bytes In      [total, mean]              42478000, 7079.67
-Bytes Out     [total, mean]              108000, 18.00
-Success       [ratio]                    100.00%
-Status Codes  [code:count]               200:4000  201:2000  
-Error Set:
+**Note:** I have tested uncommenting rate limiter on '../transport/server.go' file
 
-labib0x9@~ $ /Users/labib0x9/go/bin/vegeta attack -duration=60s -rate=500 -targets=load_test.txt | /Users/labib0x9/go/bin/vegeta report
-Requests      [total, rate, throughput]  30000, 500.02, 499.98
-Duration      [total, attack, wait]      1m0.001878583s, 59.99804475s, 3.833833ms
-Latencies     [mean, 50, 95, 99, max]    2.701042ms, 899.159µs, 6.114339ms, 25.618261ms, 74.142916ms
-Bytes In      [total, mean]              212401600, 7080.05
-Bytes Out     [total, mean]              540000, 18.00
-Success       [ratio]                    100.00%
-Status Codes  [code:count]               200:20000  201:10000  
-Error Set:
+**Run:** `k6 run -e RATE=<n> ./test/load.js`
 
-labib0x9@~ $ /Users/labib0x9/go/bin/vegeta attack -duration=60s -rate=1000 -targets=load_test.txt | /Users/labib0x9/go/bin/vegeta report
-Requests      [total, rate, throughput]  60000, 1000.02, 929.03
-Duration      [total, attack, wait]      1m0.380948333s, 59.999048666s, 381.899667ms
-Latencies     [mean, 50, 95, 99, max]    91.343658ms, 5.786054ms, 514.949585ms, 926.331481ms, 2.069997875s
-Bytes In      [total, mean]              424551330, 7075.86
-Bytes Out     [total, mean]              1080000, 18.00
-Success       [ratio]                    93.49%
-Status Codes  [code:count]               200:38289  201:17807  500:3904  
-Error Set:
-500 Internal Server Error
-```
+| Target Rate | p95 Latency | Error Rate | Achieved Throughput |
+|---|---|---|---|
+| 20 req/s    | 54ms   | 0% | 20/s   |
+| 100 req/s   | 20ms   | 0% | 100/s  |
+| 500 req/s   | 979ms  | 0% | 487/s  |
+| 1000 req/s  | 3.62s  | 0% | 403/s* |
+
+
+**Findings:**
+- Zero request failures across all load levels
+- **Redis keyspace hygiene significantly affects tail latency under load.** 
+  Clearing accumulated `short:*` keys between test runs nearly halved 
+  p95 latency at 500 req/s (1.96s → 979ms) and improved throughput by 
+  ~46% at 1000 req/s (276/s → 403/s)
+
 
 ## Future-Work
 - Upgrade token bucket rate limiting to sliding window
