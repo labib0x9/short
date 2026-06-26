@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"time"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
@@ -15,6 +16,9 @@ func NewPostgresConn(cfg *config.PostgreSQL) *sqlx.DB {
 	if err != nil {
 		panic(err)
 	}
+	conn.SetMaxOpenConns(25)
+	conn.SetMaxIdleConns(25)
+	conn.SetConnMaxIdleTime(20 * time.Minute)
 	return conn
 }
 
