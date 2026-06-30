@@ -12,6 +12,8 @@ import (
 
 func NewPostgresConn(cfg *config.PostgreSQL) *sqlx.DB {
 	dbSource := newConnectionString(cfg)
+	fmt.Printf("cfg.Addr=%q\n", cfg.Addr)
+	fmt.Printf("dbSource=%q\n", dbSource)
 	conn, err := sqlx.Connect("postgres", dbSource)
 	if err != nil {
 		panic(err)
@@ -23,15 +25,34 @@ func NewPostgresConn(cfg *config.PostgreSQL) *sqlx.DB {
 }
 
 func newConnectionString(cfg *config.PostgreSQL) string {
-	return fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=%s", cfg.User, cfg.Pass, cfg.Addr, cfg.Port, cfg.DatabaseName, cfg.SslMode)
+	// return fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=%s", cfg.User, cfg.Pass, cfg.Addr, cfg.Port, cfg.DatabaseName, cfg.SslMode)
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		cfg.User,
+		cfg.Pass,
+		cfg.Addr,
+		cfg.Port,
+		cfg.DatabaseName,
+		cfg.SslMode,
+	)
 }
 
 func newSuperConnectionString(cfg *config.PostgreSQL) string {
-	return fmt.Sprintf("user=%s password= host=%s port=%s dbname=%s sslmode=%s", cfg.SuperUser, cfg.Addr, cfg.Port, cfg.SuperDatabase, cfg.SslMode)
+	// return fmt.Sprintf("user=%s password= host=%s port=%s dbname=%s sslmode=%s", cfg.SuperUser, cfg.Addr, cfg.Port, cfg.SuperDatabase, cfg.SslMode)
+	return fmt.Sprintf(
+		"postgres://%s@%s:%s/%s?sslmode=%s",
+		cfg.SuperUser,
+		cfg.Addr,
+		cfg.Port,
+		cfg.SuperDatabase,
+		cfg.SslMode,
+	)
 }
 
 func NewPostgresSuperConn(cfg *config.PostgreSQL) *sqlx.DB {
 	dbSource := newSuperConnectionString(cfg)
+	fmt.Printf("cfg.Addr=%q\n", cfg.Addr)
+	fmt.Printf("dbSource=%q\n", dbSource)
 	conn, err := sqlx.Connect("postgres", dbSource)
 	if err != nil {
 		panic(err)
