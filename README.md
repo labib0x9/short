@@ -5,31 +5,56 @@ A URL shortener service written in Go, built with a Domain-Driven Design (DDD) a
 ## Project Structure
 
 ```
-cmd/                    → entrypoint & wiring
-  short/                → server's main.go              
-  migration/            → migration's main.go
-config/                 → environment config
-internal/
-  domain/               → entities, repository interfaces, domain errors
-    url/
-    queue/              → queue interface & ClickEvent entity
-    cache/              → cache interface
-  app/                  → application services
-    url/              
-  infra/
-    postgres/           → PostgreSQL repository implementations
-    redis/              → Redis client
-      cache/            → Cache repo implementation
-      rate_limitter/    → Rate limiter repo implementation and Lua script
-    rabbitmq/           → RabbitMQ connection, publisher, consumer
-  transport/
-    http/               → server, middleware manager, route handlers
-  worker/               → async analytics consumer (RabbitMQ)
-  utils/                → code generation, JSON helpers
-  cron/                 → Cron cleaner 
-migrations/             → SQL migration files
-static/                 → Frontend code (claude generated)
-test/                   → Test files (k6 load test)
+.
+├── cmd                                 → entrypoint & wiring
+│   ├── bootstrap                       → bootstrap cli
+│   │   ├── cmd
+│   │   └── main.go
+│   └── short                           → server
+│       └── main.go
+├── config                              → environment config parser
+├── internal
+│   ├── app                             → application layer (business logic)
+│   │   └── url
+│   │       ├── service.go
+│   ├── cron                            → Cron cleaner 
+│   ├── domain                          → domain layer (entities, repository interfaces, domain errors)
+│   │   ├── cache
+│   │   ├── db
+│   │   ├── queue
+│   │   └── url
+│   ├── infra                           → infrastructure layer
+│   │   ├── postgres
+│   │   │   ├── transaction_manager.go
+│   │   ├── rabbitmq
+│   │   └── redis
+│   │       ├── cache
+│   │       ├── rate_limitter
+│   ├── transport                       → transposrt layer
+│   │   └── http                        → HTTP server, middleware manager, route handlers
+│   │       ├── handler
+│   │       │   ├── static
+│   │       │   │   ├── handler.go
+│   │       │   │   └── routes.go
+│   │       │   └── url
+│   │       │       ├── handler.go
+│   │       │       ├── routes.go
+│   │       ├── middleware
+│   │       │   ├── manager.go
+│   │       └── server.go
+│   ├── utils                           → helper functions (code generation, json response)
+│   └── worker                          → async analytics consumer (RabbitMQ)
+├── migrations                          → SQL migration files
+├── tests                               → test files (k6 load test)
+├── static                              → frontend code (claude generated)
+├── docker-compose.yml
+├── Dockerfile
+├── go.mod
+├── go.sum
+├── .dockerignore
+├── .env.example
+├── .gitignore
+└── README.md
 ```
 
 ## Tech Stack
@@ -141,10 +166,7 @@ The worker runs with configurable concurrency (default 10) using a semaphore pat
 
 ### Prerequisites
 
-- Go 1.26+
-- PostgreSQL
-- Redis
-- RabbitMQ
+- Docker
 
 ### Environment
 
@@ -173,52 +195,33 @@ RMQ_USER=guest
 RMQ_PASS=guest
 ```
 
-### Run Migration
-See migration section
+### Run
 
-### Run Server
-
-```bash
-go run ./cmd/short/main.go
+```
+docker compose up
 ```
 
-The application will:
-1. Connect to PostgreSQL, Redis and RabbitMQ
-2. Declare the `analytics.queue` and `analytics.queue.dead` queues
-3. Start the analytics worker goroutine
-4. Start the HTTP server
-
-
-## Migration
-
-- Migrations are managed with `golang-migrate` and need to run manually via migrate cli.
-
-```bash
-# connects to super user and create user, database
-go run ./cmd/migration/main.go -setup
-
-# run the migration
-go run ./cmd/migration/main.go -up
-
-# rollback migration level-1
-go run ./cmd/migration/main.go -down
+### Build And Run
+```
+docker compose up -d --build
 ```
 
-# build the images and start everything in the background
-docker compose up --build -d
-
-# watch logs as services come up (migrate should run once and exit 0)
-docker compose logs -f
-
-# check status — migrate should show "Exited (0)", everything else "Up"
-docker compose ps
+### Docker services
+```
+services:
+  postgres:   → PostgreSQL
+  redis:      → Redis 
+  rabbitmq:   → RabbitMQ
+  bootstrap:  → CLI to setup postgres, redis and rabbitmq
+  api:        → API backend and frontend
+```
 
 
 ## Load Testing
 
 Load tested with [k6](https://k6.io) using a constant-arrival-rate scenario mixing all three core endpoints (`POST /short`, `GET /{code}`, `GET /{code}/stat`) at realistic traffic proportions (80% reads, 20% writes).
 
-**Setup:** 1000 req/s sustained for 60s, 150–500 max VUs, run via Docker Compose (API, Postgres, Redis, RabbitMQ, MinIO all containerized).
+**Setup:** 1000 req/s sustained for 60s, 150–500 max VUs, run via Docker Compose (API, Postgres, Redis, RabbitMQ, all containerized).
 
 **Run:** `shuf tests/get_urls.txt -o tests/get_urls.txt && k6 run -e RATE=1000 tests/load.js`
 
@@ -242,5 +245,4 @@ Only 5xx codes are treated as a failure, others 4xx are valid as they are expect
 
 ## Future-Work
 - Upgrade token bucket rate limiting to sliding window
-- Follow ACID Principle on database query
 - Query optimization
