@@ -52,7 +52,9 @@ type Config struct {
 
 func loadConfig() {
 	if err := godotenv.Load(".env"); err != nil {
-		log.Panic(err)
+		if !os.IsNotExist(err) {
+			log.Panic(err)
+		}
 	}
 
 	addr := os.Getenv("ADDR")

@@ -5,31 +5,56 @@ A URL shortener service written in Go, built with a Domain-Driven Design (DDD) a
 ## Project Structure
 
 ```
-cmd/                    → entrypoint & wiring
-  short/                → server's main.go              
-  migration/            → migration's main.go
-config/                 → environment config
-internal/
-  domain/               → entities, repository interfaces, domain errors
-    url/
-    queue/              → queue interface & ClickEvent entity
-    cache/              → cache interface
-  app/                  → application services
-    url/              
-  infra/
-    postgres/           → PostgreSQL repository implementations
-    redis/              → Redis client
-      cache/            → Cache repo implementation
-      rate_limitter/    → Rate limiter repo implementation and Lua script
-    rabbitmq/           → RabbitMQ connection, publisher, consumer
-  transport/
-    http/               → server, middleware manager, route handlers
-  worker/               → async analytics consumer (RabbitMQ)
-  utils/                → code generation, JSON helpers
-  cron/                 → Cron cleaner 
-migrations/             → SQL migration files
-static/                 → Frontend code (claude generated)
-test/                   → Test files (k6 load test)
+.
+├── cmd                                 → entrypoint & wiring
+│   ├── bootstrap                       → bootstrap cli
+│   │   ├── cmd
+│   │   └── main.go
+│   └── short                           → server
+│       └── main.go
+├── config                              → environment config parser
+├── internal
+│   ├── app                             → application layer (business logic)
+│   │   └── url
+│   │       ├── service.go
+│   ├── cron                            → Cron cleaner 
+│   ├── domain                          → domain layer (entities, repository interfaces, domain errors)
+│   │   ├── cache
+│   │   ├── db
+│   │   ├── queue
+│   │   └── url
+│   ├── infra                           → infrastructure layer
+│   │   ├── postgres
+│   │   │   ├── transaction_manager.go
+│   │   ├── rabbitmq
+│   │   └── redis
+│   │       ├── cache
+│   │       ├── rate_limitter
+│   ├── transport                       → transposrt layer
+│   │   └── http                        → HTTP server, middleware manager, route handlers
+│   │       ├── handler
+│   │       │   ├── static
+│   │       │   │   ├── handler.go
+│   │       │   │   └── routes.go
+│   │       │   └── url
+│   │       │       ├── handler.go
+│   │       │       ├── routes.go
+│   │       ├── middleware
+│   │       │   ├── manager.go
+│   │       └── server.go
+│   ├── utils                           → helper functions (code generation, json response)
+│   └── worker                          → async analytics consumer (RabbitMQ)
+├── migrations                          → SQL migration files
+├── tests                               → test files (k6 load test)
+├── static                              → frontend code (claude generated)
+├── docker-compose.yml
+├── Dockerfile
+├── go.mod
+├── go.sum
+├── .dockerignore
+├── .env.example
+├── .gitignore
+└── README.md
 ```
 
 ## Tech Stack
@@ -49,9 +74,9 @@ test/                   → Test files (k6 load test)
 ## Features
 
 - **URL shortening** — FNV-64 URL hash XOR'd into a UUID, base64url-encoded and truncated to 8 characters 
-- **Redirect** — `GET /:code` with Redis cache layer; expired URLs served from cache to avoid DB hits
+- **Redirect** — `GET /{code}` with Redis cache layer; expired URLs served from cache to avoid DB hits
 - **Click analytics** — async pipeline via RabbitMQ; captures browser, OS, device type, referrer, and timestamp per click
-- **Analytics endpoint** — `GET /:code/stat` returns aggregated browser/OS/device breakdown and total click count
+- **Analytics endpoint** — `GET /{code}/stat` returns aggregated browser/OS/device breakdown and total click count
 - **Rate limiting** — token bucket implemented as an atomic Lua script in Redis
 - **Dead-letter queue** — failed analytics messages are routed to `analytics.queue.dead` after exhausting retries
 - **Graceful shutdown** — SIGINT/SIGTERM handling with configurable drain timeout
@@ -80,13 +105,13 @@ Content-Type: application/json
 
 ### Redirect
 ```
-GET /:code
+GET /{code}
 → 302 redirect to original URL
 ```
 
 ### Analytics
 ```
-GET /:code/stat
+GET /{code}/stat
 ```
 ```json
 {
@@ -141,10 +166,7 @@ The worker runs with configurable concurrency (default 10) using a semaphore pat
 
 ### Prerequisites
 
-- Go 1.26+
-- PostgreSQL
-- Redis
-- RabbitMQ
+- Docker
 
 ### Environment
 
@@ -173,63 +195,54 @@ RMQ_USER=guest
 RMQ_PASS=guest
 ```
 
-### Run Migration
-See migration section
+### Run
 
-### Run Server
-
-```bash
-go run ./cmd/short/main.go
+```
+docker compose up
 ```
 
-The application will:
-1. Connect to PostgreSQL, Redis and RabbitMQ
-2. Declare the `analytics.queue` and `analytics.queue.dead` queues
-3. Start the analytics worker goroutine
-4. Start the HTTP server
-
-
-## Migration
-
-- Migrations are managed with `golang-migrate` and need to run manually via migrate cli.
-
-```bash
-# connects to super user and create user, database
-go run ./cmd/migration/main.go -setup
-
-# run the migration
-go run ./cmd/migration/main.go -up
-
-# rollback migration level-1
-go run ./cmd/migration/main.go -down
+### Build And Run
+```
+docker compose up -d --build
 ```
 
-## Performance / Load Testing
-
-Load tested with [k6](https://k6.io) at constant arrival rates with 50-500 max VUs, 60s sustained load per run.
-
-**Note:** I have tested uncommenting rate limiter on '../transport/server.go' file
-
-**Run:** `k6 run -e RATE=<n> ./test/load.js`
-
-| Target Rate | p95 Latency | Error Rate | Achieved Throughput |
-|---|---|---|---|
-| 20 req/s    | 54ms   | 0% | 20/s   |
-| 100 req/s   | 20ms   | 0% | 100/s  |
-| 500 req/s   | 979ms  | 0% | 487/s  |
-| 1000 req/s  | 3.62s  | 0% | 403/s* |
+### Docker services
+```
+services:
+  postgres:   → PostgreSQL
+  redis:      → Redis 
+  rabbitmq:   → RabbitMQ
+  bootstrap:  → CLI to setup postgres, redis and rabbitmq
+  api:        → API backend and frontend
+```
 
 
-**Findings:**
-- Zero request failures across all load levels
-- **Redis keyspace hygiene significantly affects tail latency under load.** 
-  Clearing accumulated `short:*` keys between test runs nearly halved 
-  p95 latency at 500 req/s (1.96s → 979ms) and improved throughput by 
-  ~46% at 1000 req/s (276/s → 403/s)
+## Load Testing
 
+Load tested with [k6](https://k6.io) using a constant-arrival-rate scenario mixing all three core endpoints (`POST /short`, `GET /{code}`, `GET /{code}/stat`) at realistic traffic proportions (80% reads, 20% writes).
+
+**Setup:** 1000 req/s sustained for 60s, 150–500 max VUs, run via Docker Compose (API, Postgres, Redis, RabbitMQ, all containerized).
+
+**Run:** `shuf tests/get_urls.txt -o tests/get_urls.txt && k6 run -e RATE=1000 tests/load.js`
+
+**With Rate Limiting Results (3 consecutive runs):**
+| Run | Throughput | p90 | p95 | Failed/unexpected | Dropped iterations |
+|---|---|---|---|---|---|
+| 1 | 992 req/s | 29.06ms | 67.93ms | 0.00% | 475 (0.80%) |
+| 2 | 992 req/s | 46.41ms | 102.93ms | 0.00% | 365 (0.61%) |
+| 3 | 995 req/s | 38.16ms | 80.69ms | 0.00% | 285 (0.48%) |
+| **Avg** | **993 req/s** | **~38ms** | **~84ms** | **0.00%** | **~0.63%** |
+
+**Without Rate Limiting Results (3 consecutive runs):** Commenting rate limiter on '../transport/server.go' file
+| Run | Throughput | p90 | p95 | Failed/unexpected | Dropped iterations |
+|---|---|---|---|---|---|
+| 1 | 981 req/s | 147.01ms | 248.89ms | 0.00% | 1109 (1.85%) |
+| 2 | 970 req/s | 212.35ms | 335.7ms | 0.00% | 1787 (2.98%) |
+| 3 | 920 req/s | 444.13ms | 691.12ms | 0.00% | 4605 (7.67%) |
+| **Avg** | **957 req/s** | **~267.8ms** | **~425.2ms** | **0.00%** | **~4.17%** |
+
+Only 5xx codes are treated as a failure, others 4xx are valid as they are expected.
 
 ## Future-Work
 - Upgrade token bucket rate limiting to sliding window
-- Dockerize the entire app
-- Follow ACID Principle on database query
 - Query optimization
