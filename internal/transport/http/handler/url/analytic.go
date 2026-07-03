@@ -1,6 +1,7 @@
 package url
 
 import (
+	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -22,10 +23,12 @@ func (h *Handler) Analysis(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, url.ErrShortCodeExpired):
 			utils.SendError(w, "url expired", http.StatusGone)
+		case errors.Is(err, sql.ErrNoRows):
+			utils.SendError(w, "not found", http.StatusNotFound)
 		default:
 			utils.SendError(w, "internl server error", http.StatusInternalServerError)
 		}
-		slog.Warn("Analytic: srv.Analysis()", "error", err)
+		slog.Warn("Analytic: srv.Analysis()", "error", err, "ERR", errors.Is(err, sql.ErrNoRows))
 		return
 	}
 
