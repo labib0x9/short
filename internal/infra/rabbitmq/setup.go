@@ -31,17 +31,15 @@ func NewRabbitMQ(cnf *config.RabbitMq) queue.Queue {
 		consumerCh: make(map[string]*amqp.Channel),
 	}
 
-	if err := r.setup(); err != nil {
-		conn.Close()
-		panic(err)
-	}
-
 	slog.Info("rabbitMq connection complete")
-
 	return &r
 }
+func Setup(q queue.Queue) error {
+	r, ok := q.(*rabbitMQ)
+	if !ok {
+		return fmt.Errorf("type not matched")
+	}
 
-func (r *rabbitMQ) setup() error {
 	ch, err := r.channel()
 	if err != nil {
 		return fmt.Errorf("%v: %w", queue.ErrOpeningChannel, err)

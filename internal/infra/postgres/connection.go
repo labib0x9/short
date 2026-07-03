@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -12,8 +13,6 @@ import (
 
 func NewPostgresConn(cfg *config.PostgreSQL) *sqlx.DB {
 	dbSource := newConnectionString(cfg)
-	fmt.Printf("cfg.Addr=%q\n", cfg.Addr)
-	fmt.Printf("dbSource=%q\n", dbSource)
 	conn, err := sqlx.Connect("postgres", dbSource)
 	if err != nil {
 		panic(err)
@@ -21,11 +20,11 @@ func NewPostgresConn(cfg *config.PostgreSQL) *sqlx.DB {
 	conn.SetMaxOpenConns(25)
 	conn.SetMaxIdleConns(25)
 	conn.SetConnMaxIdleTime(20 * time.Minute)
+	slog.Info("Postgres connected")
 	return conn
 }
 
 func newConnectionString(cfg *config.PostgreSQL) string {
-	// return fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=%s", cfg.User, cfg.Pass, cfg.Addr, cfg.Port, cfg.DatabaseName, cfg.SslMode)
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		cfg.User,
@@ -38,7 +37,6 @@ func newConnectionString(cfg *config.PostgreSQL) string {
 }
 
 func newSuperConnectionString(cfg *config.PostgreSQL) string {
-	// return fmt.Sprintf("user=%s password= host=%s port=%s dbname=%s sslmode=%s", cfg.SuperUser, cfg.Addr, cfg.Port, cfg.SuperDatabase, cfg.SslMode)
 	return fmt.Sprintf(
 		"postgres://%s@%s:%s/%s?sslmode=%s",
 		cfg.SuperUser,
@@ -51,8 +49,6 @@ func newSuperConnectionString(cfg *config.PostgreSQL) string {
 
 func NewPostgresSuperConn(cfg *config.PostgreSQL) *sqlx.DB {
 	dbSource := newSuperConnectionString(cfg)
-	fmt.Printf("cfg.Addr=%q\n", cfg.Addr)
-	fmt.Printf("dbSource=%q\n", dbSource)
 	conn, err := sqlx.Connect("postgres", dbSource)
 	if err != nil {
 		panic(err)
