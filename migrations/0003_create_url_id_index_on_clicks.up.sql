@@ -1,0 +1,1 @@
+create index if not exists clicks_url_id_idx on clicks(url_id);

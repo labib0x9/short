@@ -6,6 +6,8 @@ services:
       - POSTGRES_USER=${PG_SUPERUSER}
       - POSTGRES_DB=${PG_SUPERDB}
       - POSTGRES_HOST_AUTH_METHOD=trust
+      - PG_USER=${PG_USER}
+      - PG_NAME=${PG_NAME}
     ports:
       - "5432:5432"
     volumes:
