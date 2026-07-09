@@ -1,0 +1,1 @@
+drop index if exists clicks_url_id_idx;
