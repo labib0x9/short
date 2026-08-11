@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -50,21 +51,26 @@ type Config struct {
 	RabbitMq   *RabbitMq
 }
 
-func loadConfig() {
-	if err := godotenv.Load(".env"); err != nil {
+// path must be the full path of env file
+// example: /Users/short/.env
+func loadConfig(path string) {
+	if err := godotenv.Load(path); err != nil {
 		if !os.IsNotExist(err) {
 			log.Panic(err)
 		}
 	}
 
-	addr := os.Getenv("ADDR")
-	if addr == "" {
-		log.Panic("ADDR")
-	}
+	wd, _ := os.Getwd()
+	fmt.Println("cwd:", wd)
 
 	portS := os.Getenv("PORT")
 	if portS == "" {
 		log.Panic("PORT")
+	}
+
+	addr := os.Getenv("ADDR")
+	if addr == "" {
+		log.Panic("ADDR")
 	}
 
 	prefix := os.Getenv("PREFIX")
@@ -180,9 +186,9 @@ func loadConfig() {
 	}
 }
 
-func GetConfig() *Config {
+func GetConfig(path string) *Config {
 	once.Do(func() {
-		loadConfig()
+		loadConfig(path)
 	})
 	return configuration
 }

@@ -18,7 +18,7 @@ func rmqSetupfunc(cmd *cobra.Command, args []string) error {
 }
 
 func setupMessageQueue() error {
-	cnf := config.GetConfig()
+	cnf := config.GetConfig(".env")
 	conn := rabbitmq.NewRabbitMQ(cnf.RabbitMq)
 	return rabbitmq.Setup(conn)
 }

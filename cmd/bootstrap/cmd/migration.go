@@ -26,7 +26,7 @@ func dbSetupfunc(cmd *cobra.Command, args []string) error {
 }
 
 func setupDatabase() error {
-	cnf := config.GetConfig()
+	cnf := config.GetConfig(".env")
 	switch {
 	case all:
 		{
