@@ -35,7 +35,7 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, urldomain.ErrShortCodeExpired):
-			utils.SendError(w, "url expired", http.StatusGone)
+			utils.SendError(w, "bad request", http.StatusBadRequest)
 		case errors.Is(err, urldomain.ErrShortCodeCollision):
 			fallthrough
 		default:
