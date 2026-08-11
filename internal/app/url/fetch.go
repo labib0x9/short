@@ -45,7 +45,7 @@ func (s *service) Get(ctx context.Context, code, referer, userAgent, remoteAddr 
 
 	duration := 5 * time.Minute
 	if fetchedUrl.ExpireAt != nil {
-		expire := fetchedUrl.ExpireAt.Sub(fetchedUrl.CreatedAt)
+		expire := time.Until(*fetchedUrl.ExpireAt)
 		duration = min(expire, duration)
 	}
 
