@@ -23,7 +23,7 @@ import (
 
 func main() {
 
-	cnf := config.GetConfig()
+	cnf := config.GetConfig(".env")
 
 	pgConn := postgres.NewPostgresConn(cnf.PostgreSQL)
 	defer pgConn.Close()
