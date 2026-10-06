@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/labib0x9/short/internal/domain/cache"
+	"github.com/labib0x9/short/internal/port/cache"
 	go_redis "github.com/redis/go-redis/v9"
 )
 

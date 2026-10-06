@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/labib0x9/short/config"
-	"github.com/labib0x9/short/internal/domain/cache"
-	"github.com/labib0x9/short/internal/domain/db"
-	"github.com/labib0x9/short/internal/domain/queue"
 	"github.com/labib0x9/short/internal/domain/url"
+	"github.com/labib0x9/short/internal/port/cache"
+	"github.com/labib0x9/short/internal/port/db"
+	"github.com/labib0x9/short/internal/port/queue"
 )
 
 type Service interface {

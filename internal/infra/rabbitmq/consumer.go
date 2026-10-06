@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	queuedomain "github.com/labib0x9/short/internal/domain/queue"
+	queueport "github.com/labib0x9/short/internal/port/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -23,14 +23,14 @@ func (r *rabbitMQ) consume(
 ) (<-chan amqp.Delivery, error) {
 	ch, err := r.channel()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", queuedomain.ErrOpeningChannel, err)
+		return nil, fmt.Errorf("%w: %w", queueport.ErrOpeningChannel, err)
 	}
 
 	r.consumerCh[name] = ch
 
 	err = ch.Qos(concurrency, 0, false)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %w", queuedomain.ErrQoSFailed, err)
+		return nil, fmt.Errorf("%v: %w", queueport.ErrQoSFailed, err)
 	}
 
 	return ch.ConsumeWithContext(

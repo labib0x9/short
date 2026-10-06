@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/labib0x9/short/internal/app/url"
-	"github.com/labib0x9/short/internal/domain/queue"
 	urldomain "github.com/labib0x9/short/internal/domain/url"
+	"github.com/labib0x9/short/internal/port/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 

@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/labib0x9/short/config"
-	"github.com/labib0x9/short/internal/domain/cache"
+	"github.com/labib0x9/short/internal/port/cache"
 	"github.com/labib0x9/short/internal/transport/http/handler/static"
 	"github.com/labib0x9/short/internal/transport/http/handler/url"
 	"github.com/labib0x9/short/internal/transport/http/middleware"

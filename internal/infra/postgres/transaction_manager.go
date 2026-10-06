@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/labib0x9/short/internal/domain/db"
+	"github.com/labib0x9/short/internal/port/db"
 )
 
 type txKey struct{}

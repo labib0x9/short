@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/labib0x9/short/internal/domain/cache"
+	"github.com/labib0x9/short/internal/port/cache"
 	"github.com/labib0x9/short/internal/utils"
 )
 
