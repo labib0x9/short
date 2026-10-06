@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
+	"net"
+	neturl "net/url"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,26 +15,45 @@ import (
 )
 
 func newConnectionString(cfg *config.PostgreSQL) string {
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		cfg.User,
-		cfg.Pass,
-		cfg.Addr,
-		cfg.Port,
-		cfg.DatabaseName,
-		cfg.SslMode,
-	)
+	var user *neturl.Userinfo
+	if cfg.Pass != "" {
+		user = neturl.UserPassword(cfg.User, cfg.Pass)
+	} else if cfg.User != "" {
+		user = neturl.User(cfg.User)
+	}
+
+	u := &neturl.URL{
+		Scheme: "postgres",
+		User:   user,
+		Host:   net.JoinHostPort(cfg.Addr, cfg.Port),
+		Path:   strings.TrimPrefix(cfg.DatabaseName, "/"),
+	}
+	if cfg.SslMode != "" {
+		q := u.Query()
+		q.Set("sslmode", cfg.SslMode)
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
 }
 
 func newSuperConnectionString(cfg *config.PostgreSQL) string {
-	return fmt.Sprintf(
-		"postgres://%s@%s:%s/%s?sslmode=%s",
-		cfg.SuperUser,
-		cfg.Addr,
-		cfg.Port,
-		cfg.SuperDatabase,
-		cfg.SslMode,
-	)
+	var user *neturl.Userinfo
+	if cfg.SuperUser != "" {
+		user = neturl.User(cfg.SuperUser)
+	}
+
+	u := &neturl.URL{
+		Scheme: "postgres",
+		User:   user,
+		Host:   net.JoinHostPort(cfg.Addr, cfg.Port),
+		Path:   strings.TrimPrefix(cfg.SuperDatabase, "/"),
+	}
+	if cfg.SslMode != "" {
+		q := u.Query()
+		q.Set("sslmode", cfg.SslMode)
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
 }
 
 func NewPostgresPool(ctx context.Context, cfg *config.PostgreSQL) *pgxpool.Pool {

@@ -9,6 +9,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jackc/pgx/v5"
 	"github.com/labib0x9/short/config"
 )
 
@@ -16,18 +17,22 @@ func SetupDatabase(ctx context.Context, cnf *config.PostgreSQL) error {
 	conn := NewPostgresSuperConn(ctx, cnf)
 	defer conn.Close(ctx)
 
-	createRoleSQL := fmt.Sprintf(`
-		DO $$
-		BEGIN
-			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%s') THEN
-				CREATE ROLE %s WITH LOGIN PASSWORD '%s';
-			END IF;
-		END
-		$$;
-	`, cnf.User, cnf.User, cnf.Pass)
+	var roleExists bool
+	checkRoleQuery := `SELECT EXISTS(SELECT FROM pg_roles WHERE rolname = $1)`
+	if err := conn.QueryRow(ctx, checkRoleQuery, cnf.User).Scan(&roleExists); err != nil {
+		return fmt.Errorf("check role exists: %w", err)
+	}
 
-	if _, err := conn.Exec(ctx, createRoleSQL); err != nil {
-		return fmt.Errorf("create role: %w", err)
+	if !roleExists {
+		escapedPass := strings.ReplaceAll(cnf.Pass, "'", "''")
+		createRoleSQL := fmt.Sprintf(
+			`CREATE ROLE %s WITH LOGIN PASSWORD '%s'`,
+			pgx.Identifier{cnf.User}.Sanitize(),
+			escapedPass,
+		)
+		if _, err := conn.Exec(ctx, createRoleSQL); err != nil {
+			return fmt.Errorf("create role: %w", err)
+		}
 	}
 
 	var exists bool
@@ -37,13 +42,21 @@ func SetupDatabase(ctx context.Context, cnf *config.PostgreSQL) error {
 	}
 
 	if !exists {
-		createDBSQL := fmt.Sprintf(`CREATE DATABASE %s OWNER %s`, cnf.DatabaseName, cnf.User)
+		createDBSQL := fmt.Sprintf(
+			`CREATE DATABASE %s OWNER %s`,
+			pgx.Identifier{cnf.DatabaseName}.Sanitize(),
+			pgx.Identifier{cnf.User}.Sanitize(),
+		)
 		if _, err := conn.Exec(ctx, createDBSQL); err != nil {
 			return fmt.Errorf("create database: %w", err)
 		}
 	}
 
-	grantSQL := fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s`, cnf.DatabaseName, cnf.User)
+	grantSQL := fmt.Sprintf(
+		`GRANT ALL PRIVILEGES ON DATABASE %s TO %s`,
+		pgx.Identifier{cnf.DatabaseName}.Sanitize(),
+		pgx.Identifier{cnf.User}.Sanitize(),
+	)
 	if _, err := conn.Exec(ctx, grantSQL); err != nil {
 		return fmt.Errorf("grant privileges: %w", err)
 	}
