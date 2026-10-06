@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/labib0x9/short/config"
@@ -22,28 +23,28 @@ var migrateCmd = &cobra.Command{
 }
 
 func dbSetupfunc(cmd *cobra.Command, args []string) error {
-	return setupDatabase()
+	return setupDatabase(cmd.Context())
 }
 
-func setupDatabase() error {
+func setupDatabase(ctx context.Context) error {
 	cnf := config.GetConfig(".env")
 	switch {
 	case all:
 		{
-			if err := postgres.SetupDatabase(cnf.PostgreSQL); err != nil {
+			if err := postgres.SetupDatabase(ctx, cnf.PostgreSQL); err != nil {
 				return err
 			}
 		}
 		fallthrough
 	case up:
 		{
-			if err := postgres.Run(cnf.PostgreSQL); err != nil {
+			if err := postgres.Run(ctx, cnf.PostgreSQL); err != nil {
 				return err
 			}
 		}
 	case down:
 		{
-			if err := postgres.Rollback(cnf.PostgreSQL, 0); err != nil {
+			if err := postgres.Rollback(ctx, cnf.PostgreSQL, 0); err != nil {
 				return err
 			}
 		}

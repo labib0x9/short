@@ -1,28 +1,16 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
 
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labib0x9/short/config"
-	_ "github.com/lib/pq"
+	"github.com/labib0x9/short/internal/port/db"
 )
-
-func NewPostgresConn(cfg *config.PostgreSQL) *sqlx.DB {
-	dbSource := newConnectionString(cfg)
-	conn, err := sqlx.Connect("postgres", dbSource)
-	if err != nil {
-		panic(err)
-	}
-	conn.SetMaxOpenConns(25)
-	conn.SetMaxIdleConns(25)
-	conn.SetConnMaxIdleTime(20 * time.Minute)
-	slog.Info("Postgres connected")
-	return conn
-}
 
 func newConnectionString(cfg *config.PostgreSQL) string {
 	return fmt.Sprintf(
@@ -47,11 +35,38 @@ func newSuperConnectionString(cfg *config.PostgreSQL) string {
 	)
 }
 
-func NewPostgresSuperConn(cfg *config.PostgreSQL) *sqlx.DB {
-	dbSource := newSuperConnectionString(cfg)
-	conn, err := sqlx.Connect("postgres", dbSource)
+func NewPostgresPool(ctx context.Context, cfg *config.PostgreSQL) *pgxpool.Pool {
+	dbSource := newConnectionString(cfg)
+	poolConfig, err := pgxpool.ParseConfig(dbSource)
 	if err != nil {
 		panic(err)
 	}
-	return conn
+	poolConfig.MaxConns = 25
+	poolConfig.MinConns = 10
+	poolConfig.MinIdleConns = 15
+	poolConfig.MaxConnIdleTime = 20 * time.Minute
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	connPool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		panic(err)
+	}
+	slog.Info("Postgres connected")
+	return connPool
+}
+
+func NewPostgresConn(ctx context.Context, cfg *config.PostgreSQL) db.Operator {
+	connPool := NewPostgresPool(ctx, cfg)
+	return NewPgxAdapter(connPool)
+}
+
+func NewPostgresSuperConn(ctx context.Context, cfg *config.PostgreSQL) db.Operator {
+	dbSource := newSuperConnectionString(cfg)
+	conn, err := pgx.Connect(ctx, dbSource)
+	if err != nil {
+		panic(err)
+	}
+	return NewPgxAdapter(conn)
 }
