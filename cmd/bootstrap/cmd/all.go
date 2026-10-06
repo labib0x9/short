@@ -13,7 +13,7 @@ var allCmd = &cobra.Command{
 
 func allSetup(cmd *cobra.Command, args []string) error {
 	all = true
-	err := setupDatabase()
+	err := setupDatabase(cmd.Context())
 	if err != nil {
 		return err
 	}

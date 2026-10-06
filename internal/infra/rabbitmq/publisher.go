@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	queuedomain "github.com/labib0x9/short/internal/domain/queue"
+	queueport "github.com/labib0x9/short/internal/port/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -19,13 +19,13 @@ var (
 func (r *rabbitMQ) publish(ctx context.Context, queue string, msg any) error {
 	ch, err := r.channel()
 	if err != nil {
-		return fmt.Errorf("%v: %w", queuedomain.ErrOpeningChannel, err)
+		return fmt.Errorf("%v: %w", queueport.ErrOpeningChannel, err)
 	}
 	defer ch.Close()
 
 	body, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("%v: %w", queuedomain.ErrMessageEncodingFailed, err)
+		return fmt.Errorf("%v: %w", queueport.ErrMessageEncodingFailed, err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -46,13 +46,13 @@ func (r *rabbitMQ) publish(ctx context.Context, queue string, msg any) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("%v: %w", queuedomain.ErrPublishMessageFailed, err)
+		return fmt.Errorf("%v: %w", queueport.ErrPublishMessageFailed, err)
 	}
 
 	slog.Info("Message Published", "Queue:", queue)
 	return nil
 }
 
-func (r *rabbitMQ) PublishAnalytics(ctx context.Context, msg queuedomain.ClickEvent) error {
+func (r *rabbitMQ) PublishAnalytics(ctx context.Context, msg queueport.ClickEvent) error {
 	return r.publish(ctx, AnalyticQueue, msg)
 }

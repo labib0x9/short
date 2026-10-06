@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
-DOMAIN_DIR="${1:-internal/domain}"
+TARGET_DIRS=("${@}")
+if [ ${#TARGET_DIRS[@]} -eq 0 ]; then
+    TARGET_DIRS=("internal/domain" "internal/port")
+fi
 PACKAGE_NAME="mocks"
 
 if ! command -v mockgen >/dev/null 2>&1; then
@@ -20,30 +23,33 @@ fi
 
 echo "Using: $(command -v mockgen)"
 
-if [ ! -d "$DOMAIN_DIR" ]; then
-    echo "Directory $DOMAIN_DIR not found. Run this from the repo root."
-    exit 1
-fi
-
-for dir in "$DOMAIN_DIR"/*/; do
-    dir="${dir%/}"                # strip trailing slash
-    repo_file="$dir/repository.go"
-    pkg_name="$(basename "$dir")"
-
-    if [ ! -f "$repo_file" ]; then
-        echo "skip:  $pkg_name (no repository.go)"
+for target_dir in "${TARGET_DIRS[@]}"; do
+    if [ ! -d "$target_dir" ]; then
+        echo "Directory $target_dir not found, skipping."
         continue
     fi
 
-    dest_dir="$dir/mocks"
-    dest_file="$dest_dir/mock_repository.go"
+    for dir in "$target_dir"/*/; do
+        [ -d "$dir" ] || continue
+        dir="${dir%/}"                # strip trailing slash
+        repo_file="$dir/repository.go"
+        pkg_name="$(basename "$dir")"
 
-    mkdir -p "$dest_dir"
+        if [ ! -f "$repo_file" ]; then
+            echo "skip:  $pkg_name (no repository.go)"
+            continue
+        fi
 
-    echo "gen:   $repo_file -> $dest_file"
-    mockgen -source="$repo_file" \
-            -destination="$dest_file" \
-            -package="$PACKAGE_NAME"
+        dest_dir="$dir/mocks"
+        dest_file="$dest_dir/mock_repository.go"
+
+        mkdir -p "$dest_dir"
+
+        echo "gen:   $repo_file -> $dest_file"
+        mockgen -source="$repo_file" \
+                -destination="$dest_file" \
+                -package="$PACKAGE_NAME"
+    done
 done
 
 echo "Done."

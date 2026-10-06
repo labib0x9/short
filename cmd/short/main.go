@@ -23,10 +23,15 @@ import (
 
 func main() {
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
 	cnf := config.GetConfig(".env")
 
-	pgConn := postgres.NewPostgresConn(cnf.PostgreSQL)
-	defer pgConn.Close()
+	pgPool := postgres.NewPostgresPool(ctx, cnf.PostgreSQL)
+	defer pgPool.Close()
+
+	pgOp := postgres.NewPgxAdapter(pgPool)
 
 	redisClient := redis.Setup(cnf.Redis)
 	defer redisClient.Close()
@@ -34,20 +39,17 @@ func main() {
 	rabbitMq := rabbitmq.NewRabbitMQ(cnf.RabbitMq)
 	defer rabbitMq.Close()
 
-	urlRepo := postgres.NewUrlRepository(pgConn)
-	analysisRepo := postgres.NewAnalysisRepository(pgConn)
+	urlRepo := postgres.NewUrlRepository(pgOp)
+	analysisRepo := postgres.NewAnalysisRepository(pgOp)
 	cacheRepo := redis_cache.NewCache(redisClient)
 	rateLimiter := ratelimitter.NewRateLimiter(redisClient)
 
-	txMngr := postgres.NewTxManager(pgConn)
+	txMngr := postgres.NewTxManager(pgPool)
 
 	urlService := urlapp.NewService(urlRepo, analysisRepo, txMngr, cacheRepo, rabbitMq, cnf)
 
 	worker := worker.NewWorker(rabbitMq, urlService)
 	cleaner := cron.NewCleaner(urlService)
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	go worker.Run(ctx, "analytics-worker", 10)
 	go cleaner.Run(ctx)

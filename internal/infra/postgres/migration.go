@@ -1,20 +1,22 @@
 package postgres
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/labib0x9/short/config"
 )
 
-func SetupDatabase(cnf *config.PostgreSQL) error {
-	superDbConn := NewPostgresSuperConn(cnf)
-	defer superDbConn.Close()
+func SetupDatabase(ctx context.Context, cnf *config.PostgreSQL) error {
+	conn := NewPostgresSuperConn(ctx, cnf)
+	defer conn.Close(ctx)
 
-	_, err := superDbConn.Exec(fmt.Sprintf(`
+	createRoleSQL := fmt.Sprintf(`
 		DO $$
 		BEGIN
 			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%s') THEN
@@ -22,89 +24,82 @@ func SetupDatabase(cnf *config.PostgreSQL) error {
 			END IF;
 		END
 		$$;
-	`, cnf.User, cnf.User, cnf.Pass))
-	if err != nil {
-		return err
+	`, cnf.User, cnf.User, cnf.Pass)
+
+	if _, err := conn.Exec(ctx, createRoleSQL); err != nil {
+		return fmt.Errorf("create role: %w", err)
 	}
 
 	var exists bool
-	err = superDbConn.QueryRow(
-		`SELECT EXISTS(SELECT FROM pg_database WHERE datname = $1)`,
-		cnf.DatabaseName,
-	).Scan(&exists)
-	if err != nil {
-		return err
+	query := `SELECT EXISTS(SELECT FROM pg_database WHERE datname = $1)`
+	if err := conn.QueryRow(ctx, query, cnf.DatabaseName).Scan(&exists); err != nil {
+		return fmt.Errorf("check db exists: %w", err)
 	}
 
 	if !exists {
-		_, err = superDbConn.Exec(fmt.Sprintf(
-			`CREATE DATABASE %s OWNER %s`,
-			cnf.DatabaseName, cnf.User,
-		))
-		if err != nil {
-			return err
+		createDBSQL := fmt.Sprintf(`CREATE DATABASE %s OWNER %s`, cnf.DatabaseName, cnf.User)
+		if _, err := conn.Exec(ctx, createDBSQL); err != nil {
+			return fmt.Errorf("create database: %w", err)
 		}
 	}
 
-	_, err = superDbConn.Exec(fmt.Sprintf(
-		`GRANT ALL PRIVILEGES ON DATABASE %s TO %s`,
-		cnf.DatabaseName, cnf.User,
-	))
-	if err != nil {
-		return err
+	grantSQL := fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s`, cnf.DatabaseName, cnf.User)
+	if _, err := conn.Exec(ctx, grantSQL); err != nil {
+		return fmt.Errorf("grant privileges: %w", err)
 	}
 
 	slog.Info("Database setup complete, run migration to create tables")
-
 	return nil
 }
 
-func Run(cnf *config.PostgreSQL) error {
-	dbSource := newConnectionString(cnf)
+func newMigrator(cnf *config.PostgreSQL) (*migrate.Migrate, func(), error) {
+	dbSource := strings.Replace(newConnectionString(cnf), "postgres://", "pgx5://", 1)
 
-	appDB, err := sql.Open("postgres", dbSource)
+	m, err := migrate.New("file://migrations", dbSource)
+	if err != nil {
+		return nil, nil, fmt.Errorf("init migrator: %w", err)
+	}
+
+	cleanup := func() {
+		m.Close()
+	}
+
+	return m, cleanup, nil
+}
+
+func Run(ctx context.Context, cnf *config.PostgreSQL) error {
+	m, cleanup, err := newMigrator(cnf)
 	if err != nil {
 		return err
 	}
-	defer appDB.Close()
-
-	driver, err := postgres.WithInstance(appDB, &postgres.Config{})
-	if err != nil {
-		return err
-	}
-
-	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
-	if err != nil {
-		return err
-	}
+	defer cleanup()
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return err
+		return fmt.Errorf("migration up: %w", err)
 	}
+
+	slog.Info("Migrations applied successfully")
 	return nil
 }
 
-// step = 0, all
-func Rollback(cnf *config.PostgreSQL, steps int) error {
-	dbSource := newConnectionString(cnf)
-	appDB, err := sql.Open("postgres", dbSource)
+// Rollback runs down migrations. If steps == 0, it rolls back all migrations.
+func Rollback(ctx context.Context, cnf *config.PostgreSQL, steps int) error {
+	m, cleanup, err := newMigrator(cnf)
 	if err != nil {
 		return err
 	}
-	defer appDB.Close()
-
-	driver, err := postgres.WithInstance(appDB, &postgres.Config{})
-	if err != nil {
-		return err
-	}
-
-	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
-	if err != nil {
-		return err
-	}
+	defer cleanup()
 
 	if steps == 0 {
-		return m.Down()
+		if err := m.Down(); err != nil && err != migrate.ErrNoChange {
+			return fmt.Errorf("migration down: %w", err)
+		}
+	} else {
+		if err := m.Steps(-steps); err != nil && err != migrate.ErrNoChange {
+			return fmt.Errorf("migration rollback (%d steps): %w", steps, err)
+		}
 	}
-	return m.Steps(-steps)
+
+	slog.Info("Migrations rollback complete")
+	return nil
 }

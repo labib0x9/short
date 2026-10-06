@@ -6,47 +6,54 @@ A URL shortener service written in Go, built with a Domain-Driven Design (DDD) a
 
 ```
 .
-├── cmd                                 → entrypoint & wiring
-│   ├── bootstrap                       → bootstrap cli
+├── cmd                                 → entrypoints & wiring
+│   ├── bootstrap                       → bootstrap CLI (DB setup & migrations)
 │   │   ├── cmd
 │   │   └── main.go
-│   └── short                           → server
+│   └── short                           → HTTP server
 │       └── main.go
 ├── config                              → environment config parser
 ├── internal
-│   ├── app                             → application layer (business logic)
+│   ├── app                             → application layer (use cases & business logic)
 │   │   └── url
+│   │       ├── fetch.go
+│   │       ├── save_analytic.go
 │   │       ├── service.go
-│   ├── cron                            → Cron cleaner 
-│   ├── domain                          → domain layer (entities, repository interfaces, domain errors)
+│   │       └── shorten.go
+│   ├── cron                            → background cron cleaner
+│   ├── domain                          → domain core (entities, business rules, errors)
+│   │   └── url
+│   ├── infra                           → infrastructure adapters (concrete implementations)
+│   │   ├── postgres                    → pgx/v5 adapter, connection pool & repositories
+│   │   │   ├── adapter.go
+│   │   │   ├── connection.go
+│   │   │   ├── migration.go
+│   │   │   ├── transaction_manager.go
+│   │   │   └── url_repo.go
+│   │   ├── rabbitmq                    → AMQP publisher & consumer
+│   │   └── redis                       → cache & rate limiter implementations
+│   │       ├── cache
+│   │       └── rate_limitter
+│   ├── port                            → ports (driver-agnostic interfaces for db, cache, queue)
 │   │   ├── cache
 │   │   ├── db
-│   │   ├── queue
-│   │   └── url
-│   ├── infra                           → infrastructure layer
-│   │   ├── postgres
-│   │   │   ├── transaction_manager.go
-│   │   ├── rabbitmq
-│   │   └── redis
-│   │       ├── cache
-│   │       ├── rate_limitter
-│   ├── transport                       → transposrt layer
+│   │   └── queue
+│   ├── transport                       → transport layer
 │   │   └── http                        → HTTP server, middleware manager, route handlers
 │   │       ├── handler
 │   │       │   ├── static
-│   │       │   │   ├── handler.go
-│   │       │   │   └── routes.go
 │   │       │   └── url
-│   │       │       ├── handler.go
-│   │       │       ├── routes.go
 │   │       ├── middleware
+│   │       │   ├── logger.go
 │   │       │   ├── manager.go
+│   │       │   └── rate_limiter.go
 │   │       └── server.go
-│   ├── utils                           → helper functions (code generation, json response)
-│   └── worker                          → async analytics consumer (RabbitMQ)
+│   ├── utils                           → helper functions (short code generation, JSON helpers)
+│   └── worker                          → async analytics worker (RabbitMQ consumer)
 ├── migrations                          → SQL migration files
+├── scripts                             → helper & code generation scripts
 ├── tests                               → test files (k6 load test)
-├── static                              → frontend code (claude generated)
+├── static                              → frontend assets
 ├── docker-compose.yml
 ├── Dockerfile
 ├── go.mod
@@ -63,7 +70,7 @@ A URL shortener service written in Go, built with a Domain-Driven Design (DDD) a
 |---|---|
 | Language | Go 1.26 |
 | HTTP | `net/http` (stdlib only, no framework) |
-| Database | PostgreSQL (`sqlx`, `lib/pq`) |
+| Database | PostgreSQL (`pgx/v5`, `pgxpool`) |
 | Migrations | `golang-migrate` |
 | Cache | Redis (`go-redis/v9`) |
 | Message Queue | RabbitMQ (`amqp091-go`) |

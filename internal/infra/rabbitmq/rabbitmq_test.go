@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/labib0x9/short/config"
-	"github.com/labib0x9/short/internal/domain/queue"
+	"github.com/labib0x9/short/internal/port/queue"
 	"github.com/labib0x9/short/internal/infra/rabbitmq"
 	"github.com/stretchr/testify/assert"
 )

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/labib0x9/short/config"
-	"github.com/labib0x9/short/internal/domain/queue"
+	"github.com/labib0x9/short/internal/port/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 

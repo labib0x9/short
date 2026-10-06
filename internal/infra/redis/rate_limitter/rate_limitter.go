@@ -3,7 +3,7 @@ package ratelimitter
 import (
 	"context"
 
-	"github.com/labib0x9/short/internal/domain/cache"
+	"github.com/labib0x9/short/internal/port/cache"
 	"github.com/redis/go-redis/v9"
 )
 

@@ -2,45 +2,48 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/labib0x9/short/internal/domain/db"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/labib0x9/short/internal/port/db"
 )
 
 type txKey struct{}
 
 type txManager struct {
-	db *sqlx.DB
+	pool *pgxpool.Pool
 }
 
-func NewTxManager(db *sqlx.DB) db.TxManager {
+func NewTxManager(pool *pgxpool.Pool) db.TxManager {
 	return &txManager{
-		db: db,
+		pool: pool,
 	}
 }
 
 func (t *txManager) With(ctx context.Context, fn func(ctx context.Context) (any, error)) (any, error) {
-	tx, err := t.db.BeginTxx(ctx, &sql.TxOptions{
-		Isolation: sql.LevelRepeatableRead,
+	tx, err := t.pool.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel: pgx.RepeatableRead,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	txCtx := context.WithValue(ctx, txKey{}, tx)
+	txOp := NewPgxAdapter(tx)
+	txCtx := context.WithValue(ctx, txKey{}, txOp)
+
 	result, err := fn(txCtx)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback(ctx)
 		return nil, err
 	}
-	return result, tx.Commit()
+	return result, tx.Commit(ctx)
 }
 
-// Get db connection from context, if absent fallback to db
-func getDBFromCtx(ctx context.Context, db *sqlx.DB) sqlx.ExtContext {
-	if tx, ok := ctx.Value(txKey{}).(*sqlx.Tx); ok {
-		return tx
+// getDBFromCtx extracts the transactional db.Operator from context, or falls back to defaultDB
+func getDBFromCtx(ctx context.Context, defaultDB db.Operator) db.Operator {
+	if txOp, ok := ctx.Value(txKey{}).(db.Operator); ok {
+		return txOp
 	}
-	return db
+	return defaultDB
 }
+

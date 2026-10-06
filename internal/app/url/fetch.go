@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/labib0x9/short/internal/domain/queue"
 	"github.com/labib0x9/short/internal/domain/url"
+	"github.com/labib0x9/short/internal/port/queue"
 )
 
 func (s *service) Get(ctx context.Context, code, referer, userAgent, remoteAddr string) (*url.Url, error) {

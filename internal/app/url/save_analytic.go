@@ -3,8 +3,8 @@ package url
 import (
 	"context"
 
-	"github.com/labib0x9/short/internal/domain/queue"
 	"github.com/labib0x9/short/internal/domain/url"
+	"github.com/labib0x9/short/internal/port/queue"
 	"github.com/mileusna/useragent"
 )
 
