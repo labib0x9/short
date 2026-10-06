@@ -2,15 +2,14 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/labib0x9/short/config"
-	_ "github.com/lib/pq"
 )
 
 func SetupDatabase(ctx context.Context, cnf *config.PostgreSQL) error {
@@ -54,28 +53,15 @@ func SetupDatabase(ctx context.Context, cnf *config.PostgreSQL) error {
 }
 
 func newMigrator(cnf *config.PostgreSQL) (*migrate.Migrate, func(), error) {
-	dbSource := newConnectionString(cnf)
+	dbSource := strings.Replace(newConnectionString(cnf), "postgres://", "pgx5://", 1)
 
-	appDB, err := sql.Open("postgres", dbSource)
+	m, err := migrate.New("file://migrations", dbSource)
 	if err != nil {
-		return nil, nil, fmt.Errorf("open db for migration: %w", err)
-	}
-
-	driver, err := postgres.WithInstance(appDB, &postgres.Config{})
-	if err != nil {
-		appDB.Close()
-		return nil, nil, fmt.Errorf("create migration driver: %w", err)
-	}
-
-	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
-	if err != nil {
-		appDB.Close()
 		return nil, nil, fmt.Errorf("init migrator: %w", err)
 	}
 
 	cleanup := func() {
 		m.Close()
-		appDB.Close()
 	}
 
 	return m, cleanup, nil
