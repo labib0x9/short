@@ -27,13 +27,13 @@ func (t *txManager) With(ctx context.Context, fn func(ctx context.Context) (any,
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback(ctx)
 
 	txOp := NewPgxAdapter(tx)
 	txCtx := context.WithValue(ctx, txKey{}, txOp)
 
 	result, err := fn(txCtx)
 	if err != nil {
-		_ = tx.Rollback(ctx)
 		return nil, err
 	}
 	return result, tx.Commit(ctx)
@@ -46,4 +46,3 @@ func getDBFromCtx(ctx context.Context, defaultDB db.Operator) db.Operator {
 	}
 	return defaultDB
 }
-
