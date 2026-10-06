@@ -27,8 +27,12 @@ func NewUrlRepository(db db.Operator) url.UrlRepository {
 
 func (u *urlRepo) Create(ctx context.Context, item url.Url) error {
 	op := getDBFromCtx(ctx, u.db)
-	query := `INSERT INTO urls(url, short, expire_at) VALUES ($1, $2, $3)`
-	_, err := op.Exec(ctx, query, item.URL, item.ShortURL, item.ExpireAt)
+	query := `INSERT INTO urls(url, short, expire_at) VALUES (@url, @short, @expire_at)`
+	_, err := op.Exec(ctx, query, pgx.NamedArgs{
+		"url":       item.URL,
+		"short":     item.ShortURL,
+		"expire_at": item.ExpireAt,
+	})
 	return err
 }
 
@@ -59,10 +63,13 @@ func (u *urlRepo) Update(ctx context.Context, id uuid.UUID, lastClickedAt time.T
 	query := `
 		UPDATE urls
 		SET
-			last_clicked_at = $1,
+			last_clicked_at = @last_clicked_at,
 			total = COALESCE(total, 0) + 1
-		WHERE id = $2`
-	_, err := op.Exec(ctx, query, lastClickedAt, id)
+		WHERE id = @id`
+	_, err := op.Exec(ctx, query, pgx.NamedArgs{
+		"last_clicked_at": lastClickedAt,
+		"id":              id,
+	})
 	return err
 }
 
@@ -111,18 +118,20 @@ func (a *analysisRepo) Create(ctx context.Context, click url.Click) error {
 	op := getDBFromCtx(ctx, a.db)
 	query := `
 		INSERT INTO clicks(url_id, referer, country, device, os, browser, clicked_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES (@url_id, @referer, @country, @device, @os, @browser, @clicked_at)
 	`
 	_, err := op.Exec(
 		ctx,
 		query,
-		click.UrlId,
-		click.Referer,
-		click.Country,
-		click.DeviceType,
-		click.Os,
-		click.Browser,
-		click.ClickedAt,
+		pgx.NamedArgs{
+			"url_id":     click.UrlId,
+			"referer":    click.Referer,
+			"country":    click.Country,
+			"device":     click.DeviceType,
+			"os":         click.Os,
+			"browser":    click.Browser,
+			"clicked_at": click.ClickedAt,
+		},
 	)
 	return err
 }
