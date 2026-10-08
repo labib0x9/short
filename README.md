@@ -10,7 +10,9 @@ A URL shortener service written in Go, built with a Domain-Driven Design (DDD) a
 │   ├── bootstrap                       → bootstrap CLI (DB setup & migrations)
 │   │   ├── cmd
 │   │   └── main.go
-│   └── short                           → HTTP server
+│   ├── short                           → HTTP server
+│   │   └── main.go
+│   └── seed                            → seed database with random URLs
 │       └── main.go
 ├── config                              → environment config parser
 ├── internal
@@ -56,6 +58,7 @@ A URL shortener service written in Go, built with a Domain-Driven Design (DDD) a
 ├── static                              → frontend assets
 ├── docker-compose.yml
 ├── Dockerfile
+├── Dockerfile.seed
 ├── go.mod
 ├── go.sum
 ├── .dockerignore
@@ -223,6 +226,22 @@ services:
   api:        → API backend and frontend
 ```
 
+---
+
+## Seed Database with Random URLs
+
+```
+# 1. Build the seed image
+docker build -f Dockerfile.seed -t short-seed .
+
+# 2. Run the seeder attached to your docker compose backend network
+docker run --rm \
+  --network short_backend \
+  --env-file .env \
+  short-seed
+```
+
+---
 
 ## Load Testing
 
