@@ -13,6 +13,8 @@ import (
 	"github.com/labib0x9/short/internal/infra/postgres"
 	"github.com/labib0x9/short/internal/infra/rabbitmq"
 	"github.com/labib0x9/short/internal/infra/redis"
+	"github.com/labib0x9/short/internal/port/queue"
+	"github.com/labib0x9/short/internal/worker"
 
 	urlapp "github.com/labib0x9/short/internal/app/url"
 	redis_cache "github.com/labib0x9/short/internal/infra/redis/cache"
@@ -549,6 +551,11 @@ func main() {
 
 	urlService := urlapp.NewService(urlRepo, analysisRepo, txMngr, cacheRepo, rabbitMq, cnf)
 
+	worker := worker.NewWorker(rabbitMq, urlService)
+	go worker.Run(ctx, "analytics-worker", 10)
+
+	totalAnalytics := 0
+
 	for i := 0; i < testNumber; i += 100 {
 		var wg sync.WaitGroup
 		for j := 0; j < 100; j++ {
@@ -563,10 +570,32 @@ func main() {
 
 				longUrl := urls[rand.Intn(len(urls))]
 
-				_, err := urlService.Shorten(ctxx, longUrl, &expireAt, userAgent.Raw)
+				res, err := urlService.Shorten(ctxx, longUrl, &expireAt, userAgent.Raw)
 				if err != nil {
 					slog.Error("urlService.Shorted()", "error", err)
+					return
 				}
+
+				for k := 0; k < rand.Intn(120); k++ {
+					if totalAnalytics > testNumber {
+						break
+					}
+					ctx, cancel := context.WithTimeout(ctxx, 5*time.Second)
+					defer cancel()
+					if err := rabbitMq.PublishAnalytics(ctx, queue.ClickEvent{
+						ShortCode: res.Code,
+						ClickedAt: time.Now(),
+						Referer:   "",
+						UserAgent: useragent.PickRandom().Raw,
+						IP:        "[IP_ADDRESS]",
+						Retries:   2,
+					}); err != nil {
+						slog.Error("Publishing failed", "error", err, "short", res.Code)
+						continue
+					}
+					totalAnalytics++
+				}
+
 			}(ctx, j)
 			wg.Wait()
 		}
