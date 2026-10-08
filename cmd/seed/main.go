@@ -554,8 +554,6 @@ func main() {
 	worker := worker.NewWorker(rabbitMq, urlService)
 	go worker.Run(ctx, "analytics-worker", 10)
 
-	totalAnalytics := 0
-
 	for i := 0; i < testNumber; i += 100 {
 		var wg sync.WaitGroup
 		for j := 0; j < 100; j++ {
@@ -577,9 +575,6 @@ func main() {
 				}
 
 				for k := 0; k < rand.Intn(120); k++ {
-					if totalAnalytics > testNumber {
-						break
-					}
 					ctx, cancel := context.WithTimeout(ctxx, 5*time.Second)
 					defer cancel()
 					if err := rabbitMq.PublishAnalytics(ctx, queue.ClickEvent{
@@ -593,7 +588,6 @@ func main() {
 						slog.Error("Publishing failed", "error", err, "short", res.Code)
 						continue
 					}
-					totalAnalytics++
 				}
 
 			}(ctx, j)
