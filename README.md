@@ -238,6 +238,9 @@ docker build -f Dockerfile.seed -t short-seed .
 docker run --rm \
   --network short_backend \
   --env-file .env \
+  -e RMQ_ADDR=rabbitmq:5672 \
+  -e PG_ADDRESS=postgres \
+  -e REDIS_ADDR=redis:6379 \
   short-seed
 ```
 
